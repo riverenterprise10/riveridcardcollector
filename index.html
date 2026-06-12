@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ID Card Collector — Sign In</title>
+  <meta name="description" content="Secure cloud ID card data collection platform. Sign up or log in to start collecting." />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; }
+
+    .auth-wrapper {
+      width: 100%; max-width: 440px;
+      animation: fadeInUp 0.5s ease;
+    }
+
+    .auth-logo {
+      text-align: center; margin-bottom: 2rem;
+    }
+    .auth-logo-icon {
+      width: 70px; height: 70px;
+      background: linear-gradient(135deg, #4f8ef7, #7c5cfc);
+      border-radius: 22px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 2rem;
+      margin-bottom: 0.8rem;
+      box-shadow: 0 12px 40px rgba(79,142,247,0.4);
+    }
+    .auth-logo h1 {
+      font-size: 1.6rem; font-weight: 800;
+      background: linear-gradient(135deg, #f0f4ff, #94a3b8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .auth-logo p { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.3rem; }
+
+    .auth-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      padding: 2rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .tab-header {
+      display: flex;
+      background: rgba(255,255,255,0.04);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      margin-bottom: 1.8rem;
+      gap: 4px;
+    }
+    .tab-btn {
+      flex: 1; padding: 0.6rem;
+      border: none; border-radius: 6px;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; transition: var(--transition);
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      box-shadow: 0 4px 15px rgba(79,142,247,0.3);
+    }
+
+    .auth-form { display: none; }
+    .auth-form.active { display: block; }
+
+    .divider {
+      display: flex; align-items: center; gap: 0.8rem;
+      margin: 1rem 0;
+      color: var(--text-muted); font-size: 0.8rem;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px;
+      background: var(--border);
+    }
+
+    .identifier-type {
+      display: flex; gap: 0.5rem; margin-bottom: 0.5rem;
+    }
+    .id-type-btn {
+      flex: 1; padding: 0.4rem;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text-muted);
+      font-family: 'Inter', sans-serif; font-size: 0.8rem;
+      cursor: pointer; transition: var(--transition);
+    }
+    .id-type-btn.active {
+      border-color: var(--accent); color: var(--accent);
+      background: rgba(79,142,247,0.1);
+    }
+
+    .strength-bar {
+      height: 3px; border-radius: 2px;
+      background: var(--border); margin-top: 0.4rem;
+      overflow: hidden;
+    }
+    .strength-fill {
+      height: 100%; border-radius: 2px;
+      transition: width 0.3s ease, background 0.3s ease;
+      width: 0%;
+    }
+
+    .footer-text {
+      text-align: center; margin-top: 1.5rem;
+      color: var(--text-muted); font-size: 0.82rem;
+    }
+  </style>
+</head>
+<body>
+<div id="toast-container"></div>
+
+<div class="auth-wrapper">
+  <div class="auth-logo">
+    <div class="auth-logo-icon">🪪</div>
+    <h1>ID Card Collector</h1>
+    <p>Cloud-based ID data collection platform</p>
+  </div>
+
+  <div class="auth-card">
+    <div class="tab-header">
+      <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">🔐 Sign In</button>
+      <button class="tab-btn" id="tab-signup" onclick="switchTab('signup')">✨ Sign Up</button>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <form class="auth-form active" id="form-login" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label class="form-label">Email or Mobile Number <span class="required">*</span></label>
+        <div class="input-group">
+          <span class="input-group-icon">👤</span>
+          <input type="text" id="login-identifier" class="form-control has-icon"
+            placeholder="Enter email or mobile number" required autocomplete="username" />
+        </div>
+        <div class="form-error" id="login-identifier-err"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Password <span class="required">*</span></label>
+        <div class="input-group">
+          <span class="input-group-icon">🔒</span>
+          <input type="password" id="login-password" class="form-control has-icon"
+            placeholder="Enter your password" required autocomplete="current-password"
+            style="border-radius: var(--radius-sm) 0 0 var(--radius-sm); border-right: none;" />
+          <div class="input-group-append">
+            <button type="button" class="input-group-btn" onclick="togglePwd('login-password', this)" title="Show/Hide">👁️</button>
+          </div>
+        </div>
+        <div class="form-error" id="login-password-err"></div>
+      </div>
+
+      <div id="login-alert"></div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg" id="login-btn">
+        Sign In →
+      </button>
+    </form>
+
+    <!-- SIGNUP FORM -->
+    <form class="auth-form" id="form-signup" onsubmit="handleSignup(event)">
+      <div class="form-group">
+        <label class="form-label">Sign up with</label>
+        <div class="identifier-type">
+          <button type="button" class="id-type-btn active" id="type-email" onclick="setIdentifierType('email')">📧 Email</button>
+          <button type="button" class="id-type-btn" id="type-mobile" onclick="setIdentifierType('mobile')">📱 Mobile</button>
+        </div>
+        <div class="input-group">
+          <span class="input-group-icon" id="signup-icon">📧</span>
+          <input type="text" id="signup-identifier" class="form-control has-icon"
+            placeholder="Enter your email" required autocomplete="username" />
+        </div>
+        <div class="form-error" id="signup-identifier-err"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Full Name <span class="required">*</span></label>
+        <div class="input-group">
+          <span class="input-group-icon">🧑</span>
+          <input type="text" id="signup-name" class="form-control has-icon"
+            placeholder="Your full name" required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Password <span class="required">*</span></label>
+        <div class="input-group">
+          <span class="input-group-icon">🔒</span>
+          <input type="password" id="signup-password" class="form-control has-icon"
+            placeholder="Create a strong password" required
+            oninput="checkStrength(this.value)"
+            style="border-radius: var(--radius-sm) 0 0 var(--radius-sm); border-right: none;" />
+          <div class="input-group-append">
+            <button type="button" class="input-group-btn" onclick="togglePwd('signup-password', this)">👁️</button>
+          </div>
+        </div>
+        <div class="strength-bar"><div class="strength-fill" id="strength-fill"></div></div>
+        <div class="form-error" id="signup-password-err"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Confirm Password <span class="required">*</span></label>
+        <div class="input-group">
+          <span class="input-group-icon">🔒</span>
+          <input type="password" id="signup-confirm" class="form-control has-icon"
+            placeholder="Repeat password" required
+            style="border-radius: var(--radius-sm) 0 0 var(--radius-sm); border-right: none;" />
+          <div class="input-group-append">
+            <button type="button" class="input-group-btn" onclick="togglePwd('signup-confirm', this)">👁️</button>
+          </div>
+        </div>
+        <div class="form-error" id="signup-confirm-err"></div>
+      </div>
+
+      <div id="signup-alert"></div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg" id="signup-btn">
+        Create Account →
+      </button>
+    </form>
+
+    <p class="footer-text">
+      🔒 Your data is stored securely in your browser
+    </p>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+<script src="js/db.js"></script>
+<script>
+  // Redirect if already logged in
+  if (getCurrentUser()) window.location.href = 'dashboard.html';
+
+  let identifierType = 'email';
+
+  function switchTab(tab) {
+    document.getElementById('form-login').classList.toggle('active', tab === 'login');
+    document.getElementById('form-signup').classList.toggle('active', tab === 'signup');
+    document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+    document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+  }
+
+  function setIdentifierType(type) {
+    identifierType = type;
+    document.getElementById('type-email').classList.toggle('active', type === 'email');
+    document.getElementById('type-mobile').classList.toggle('active', type === 'mobile');
+    const input = document.getElementById('signup-identifier');
+    const icon = document.getElementById('signup-icon');
+    if (type === 'email') {
+      input.placeholder = 'Enter your email'; input.type = 'email'; icon.textContent = '📧';
+    } else {
+      input.placeholder = 'Enter 10-digit mobile number'; input.type = 'tel'; icon.textContent = '📱';
+    }
+  }
+
+  function togglePwd(id, btn) {
+    const inp = document.getElementById(id);
+    if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+    else { inp.type = 'password'; btn.textContent = '👁️'; }
+  }
+
+  function checkStrength(pwd) {
+    const fill = document.getElementById('strength-fill');
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    const colors = ['#f56565', '#ed8936', '#ecc94b', '#48bb78'];
+    const widths = ['25%', '50%', '75%', '100%'];
+    fill.style.width = score > 0 ? widths[score - 1] : '0%';
+    fill.style.background = score > 0 ? colors[score - 1] : 'transparent';
+  }
+
+  function showAlert(containerId, message, type = 'danger') {
+    const el = document.getElementById(containerId);
+    el.innerHTML = `<div class="alert alert-${type}"><span>${type === 'danger' ? '❌' : '✅'}</span>${message}</div>`;
+  }
+  function clearAlert(id) { document.getElementById(id).innerHTML = ''; }
+
+  function validateEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
+  function validateMobile(mobile) { return /^[6-9]\d{9}$/.test(mobile); }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    clearAlert('login-alert');
+    const identifier = document.getElementById('login-identifier').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    if (!identifier || !password) {
+      showAlert('login-alert', 'Please fill in all fields.'); return;
+    }
+
+    const btn = document.getElementById('login-btn');
+    const origText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner"></span> Logging in...';
+    btn.disabled = true;
+
+    try {
+      const users = await getUsers();
+      const user = users.find(u => u.identifier === identifier && u.password === btoa(password));
+      if (!user) {
+        showAlert('login-alert', 'Invalid credentials. Please try again.'); 
+        btn.innerHTML = origText; btn.disabled = false;
+        return;
+      }
+
+      setCurrentUser(user);
+      showToast('Welcome back! 👋', 'success');
+      setTimeout(() => window.location.href = 'dashboard.html', 500);
+    } catch (err) {
+      console.error(err);
+      showAlert('login-alert', 'Error connecting to database.');
+      btn.innerHTML = origText; btn.disabled = false;
+    }
+  }
+
+  async function handleSignup(e) {
+    e.preventDefault();
+    clearAlert('signup-alert');
+    const identifier = document.getElementById('signup-identifier').value.trim();
+    const name = document.getElementById('signup-name').value.trim();
+    const password = document.getElementById('signup-password').value;
+    const confirm = document.getElementById('signup-confirm').value;
+
+    // Validate
+    if (!identifier) { showAlert('signup-alert', 'Please enter email or mobile number.'); return; }
+    if (identifierType === 'email' && !validateEmail(identifier)) {
+      showAlert('signup-alert', 'Please enter a valid email address.'); return;
+    }
+    if (identifierType === 'mobile' && !validateMobile(identifier)) {
+      showAlert('signup-alert', 'Please enter a valid 10-digit mobile number.'); return;
+    }
+    if (!name) { showAlert('signup-alert', 'Please enter your full name.'); return; }
+    if (password.length < 6) { showAlert('signup-alert', 'Password must be at least 6 characters.'); return; }
+    if (password !== confirm) { showAlert('signup-alert', 'Passwords do not match.'); return; }
+
+    const btn = document.getElementById('signup-btn');
+    const origText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner"></span> Creating Account...';
+    btn.disabled = true;
+
+    try {
+      const users = await getUsers();
+      if (users.find(u => u.identifier === identifier)) {
+        showAlert('signup-alert', 'This email/mobile is already registered. Please sign in.');
+        btn.innerHTML = origText; btn.disabled = false;
+        return;
+      }
+
+      const newUser = { id: generateId(), identifier, name, password: btoa(password), role: 'user', createdAt: new Date().toISOString() };
+      await addUser(newUser);
+      setCurrentUser(newUser);
+
+      showToast('Account created! Welcome! 🎉', 'success');
+      setTimeout(() => window.location.href = 'dashboard.html', 600);
+    } catch (err) {
+      console.error(err);
+      showAlert('signup-alert', 'Error creating account in database.');
+      btn.innerHTML = origText; btn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>

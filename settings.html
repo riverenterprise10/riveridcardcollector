@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings — ID Card Collector</title>
+  <meta name="description" content="Manage custom fields and app settings for your ID card data collection." />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .settings-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 768px) { .settings-layout { grid-template-columns: 1fr; } }
+    .fields-list { display: flex; flex-direction: column; gap: 0.6rem; min-height: 80px; }
+    .drag-handle { cursor: grab; color: var(--text-muted); font-size: 1.1rem; }
+    .drag-handle:active { cursor: grabbing; }
+    .no-fields { color: var(--text-muted); font-size: 0.875rem; text-align: center; padding: 1.5rem; }
+    .field-type-badge { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 4px; }
+    .ft-text { background: rgba(79,142,247,0.15); color: #60a5fa; }
+    .ft-number { background: rgba(0,212,170,0.15); color: #6ee7b7; }
+    .ft-date { background: rgba(124,92,252,0.15); color: #a78bfa; }
+    .ft-dropdown { background: rgba(237,137,54,0.15); color: #fbbf24; }
+    .ft-textarea { background: rgba(245,101,101,0.15); color: #fc8181; }
+    .preview-form { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+    .danger-zone { background: rgba(245,101,101,0.05); border: 1px solid rgba(245,101,101,0.2); border-radius: var(--radius); padding: 1.5rem; }
+    .danger-zone h3 { color: var(--danger); margin-bottom: 0.5rem; }
+    .danger-zone p { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1rem; }
+    .counter-display { text-align: center; }
+    .counter-display .big-num { font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; }
+    .counter-display p { color: var(--text-muted); font-size: 0.875rem; margin-top: 0.3rem; }
+    .form-row { display: flex; gap: 0.8rem; align-items: flex-end; flex-wrap: wrap; }
+    .form-row .form-group { flex: 1; min-width: 120px; margin-bottom: 0; }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a href="dashboard.html" class="navbar-brand">
+    <div class="brand-icon">🪪</div>
+    ID Card Collector
+  </a>
+  <ul class="navbar-nav">
+    <li><a href="dashboard.html" class="nav-link">📊 Dashboard</a></li>
+    <li><a href="collect.html" class="nav-link">➕ Add Record</a></li>
+    <li><a href="settings.html" class="nav-link active">⚙️ Settings</a></li>
+    <li><a href="import.html" class="nav-link">📥 Import Excel</a></li>
+    <li><a href="admin.html" class="nav-link" id="nav-admin-link" style="display:none;">🔑 Admin</a></li>
+  </ul>
+  <div class="navbar-right">
+    <div class="user-badge">
+      <div class="avatar" id="user-avatar">U</div>
+      <span id="user-badge-text">User</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">🚪 Logout</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-header">
+    <h1>⚙️ Settings</h1>
+    <p>Manage custom fields, photo counter, and app preferences</p>
+  </div>
+
+  <div class="settings-layout">
+
+    <!-- LEFT COLUMN -->
+    <div>
+      <!-- ADD CUSTOM FIELD -->
+      <div class="card" style="margin-bottom:1.5rem;">
+        <div class="section-title">🔧 Add Custom Field</div>
+
+        <div class="form-group">
+          <label class="form-label">Field Label <span class="required">*</span></label>
+          <input type="text" id="cf-label" class="form-control" placeholder="e.g., Blood Group, Nationality" />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Field Type</label>
+            <select id="cf-type" class="form-control" onchange="onTypeChange()">
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="date">Date</option>
+              <option value="dropdown">Dropdown</option>
+              <option value="textarea">Textarea</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Placeholder</label>
+            <input type="text" id="cf-placeholder" class="form-control" placeholder="Optional hint" />
+          </div>
+        </div>
+
+        <div class="form-group" id="dropdown-options-group" style="display:none;">
+          <label class="form-label">Dropdown Options <span class="required">*</span></label>
+          <input type="text" id="cf-options" class="form-control" placeholder="Option1, Option2, Option3 (comma-separated)" />
+          <div class="form-hint">Separate options with commas</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Helper Hint (optional)</label>
+          <input type="text" id="cf-hint" class="form-control" placeholder="Extra instruction for the user" />
+        </div>
+
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:1rem;">
+          <label class="switch">
+            <input type="checkbox" id="cf-required" />
+            <span class="slider"></span>
+          </label>
+          <span style="font-size:0.875rem;color:var(--text-secondary);">Make this field required</span>
+        </div>
+
+        <button class="btn btn-primary btn-full" onclick="addCustomField()">➕ Add Custom Field</button>
+      </div>
+
+      <!-- PHOTO COUNTER -->
+      <div class="card" style="margin-bottom:1.5rem;">
+        <div class="section-title">🔢 Photo Number Counter</div>
+        <div class="counter-display">
+          <div class="big-num" id="counter-display">000</div>
+          <p>Current photo counter value</p>
+          <p style="margin-top:0.3rem;">Next photo will be: <strong id="next-photo-num" style="color:var(--accent);">001</strong></p>
+        </div>
+        <div style="display:flex;gap:0.8rem;margin-top:1.2rem;">
+          <input type="number" id="counter-input" class="form-control" placeholder="Set counter value (0–999)" min="0" max="999" />
+          <button class="btn btn-outline" onclick="setCounter()">Set</button>
+        </div>
+        <button class="btn btn-ghost btn-full" style="margin-top:0.8rem;" onclick="resetCounter()">↺ Reset to 0</button>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div>
+      <!-- CUSTOM FIELDS LIST -->
+      <div class="card" style="margin-bottom:1.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+          <div class="section-title" style="margin:0;">📋 Current Custom Fields</div>
+          <button class="btn btn-danger btn-sm" onclick="clearAllCustomFields()" id="clear-all-btn" style="display:none;">🗑️ Clear All</button>
+        </div>
+        <div class="fields-list" id="fields-list">
+          <div class="no-fields">No custom fields added yet.<br/>Add fields from the left panel.</div>
+        </div>
+      </div>
+
+      <!-- LIVE PREVIEW -->
+      <div class="card" style="margin-bottom:1.5rem;">
+        <div class="section-title">👁️ Live Form Preview</div>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1rem;">How custom fields will appear in the collection form:</p>
+        <div id="fields-preview">
+          <p style="color:var(--text-muted);font-size:0.875rem;text-align:center;">No custom fields to preview</p>
+        </div>
+      </div>
+
+      <!-- DANGER ZONE -->
+      <div class="danger-zone">
+        <h3>⚠️ Danger Zone</h3>
+        <p>These actions are irreversible. Proceed with caution.</p>
+        <div style="display:flex;flex-direction:column;gap:0.8rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.2);border-radius:var(--radius-sm);padding:0.8rem 1rem;">
+            <div>
+              <div style="font-size:0.875rem;font-weight:600;">Delete All Records</div>
+              <div style="font-size:0.78rem;color:var(--text-muted);">Permanently remove all collected data</div>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="confirmDeleteAll()">🗑️ Delete All</button>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.2);border-radius:var(--radius-sm);padding:0.8rem 1rem;">
+            <div>
+              <div style="font-size:0.875rem;font-weight:600;">Reset Everything</div>
+              <div style="font-size:0.78rem;color:var(--text-muted);">Clear all data, fields, and counter</div>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="confirmResetAll()">💥 Reset App</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="confirm-title">⚠️ Confirm Action</span>
+      <button class="modal-close" onclick="closeConfirm()">✕</button>
+    </div>
+    <p id="confirm-message" style="color:var(--text-secondary);margin-bottom:1.5rem;"></p>
+    <div style="display:flex;gap:0.8rem;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-danger" id="confirm-action-btn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<!-- Firebase CDNs -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+<script src="js/db.js"></script>
+<script>
+  const user = requireAdmin();
+  let confirmCallback = null;
+
+  async function init() {
+    renderUserBadge();
+    highlightNav();
+    await renderFields();
+    await updateCounterDisplay();
+  }
+
+  function onTypeChange() {
+    const type = document.getElementById('cf-type').value;
+    document.getElementById('dropdown-options-group').style.display = type === 'dropdown' ? 'block' : 'none';
+  }
+
+  async function addCustomField() {
+    const label = document.getElementById('cf-label').value.trim();
+    const type = document.getElementById('cf-type').value;
+    const placeholder = document.getElementById('cf-placeholder').value.trim();
+    const hint = document.getElementById('cf-hint').value.trim();
+    const required = document.getElementById('cf-required').checked;
+    const options = document.getElementById('cf-options').value.trim();
+
+    if (!label) { showToast('Please enter a field label.', 'error'); return; }
+    if (type === 'dropdown' && !options) { showToast('Please add dropdown options.', 'error'); return; }
+
+    const fields = await getCustomFields();
+    const key = 'cf_' + label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
+
+    if (fields.find(f => f.label.toLowerCase() === label.toLowerCase())) {
+      showToast('A field with this label already exists.', 'error'); return;
+    }
+
+    fields.push({ key, label, type, placeholder, hint, required, options });
+    await saveCustomFields(fields);
+
+    // Reset form
+    document.getElementById('cf-label').value = '';
+    document.getElementById('cf-placeholder').value = '';
+    document.getElementById('cf-hint').value = '';
+    document.getElementById('cf-required').checked = false;
+    document.getElementById('cf-options').value = '';
+    document.getElementById('cf-type').value = 'text';
+    document.getElementById('dropdown-options-group').style.display = 'none';
+
+    await renderFields();
+    showToast(`Custom field "${label}" added! ✅`, 'success');
+  }
+
+  async function removeField(key) {
+    let fields = await getCustomFields();
+    fields = fields.filter(f => f.key !== key);
+    await saveCustomFields(fields);
+    await renderFields();
+    showToast('Field removed.', 'info');
+  }
+
+  function clearAllCustomFields() {
+    showConfirm('Clear All Custom Fields', 'This will remove all custom fields. Existing record data for these fields will be preserved.', async () => {
+      await saveCustomFields([]);
+      await renderFields();
+      showToast('All custom fields cleared.', 'info');
+    });
+  }
+
+  const TYPE_ICONS = { text: '📝', number: '🔢', date: '📅', dropdown: '▼', textarea: '📄' };
+  const TYPE_CLASSES = { text: 'ft-text', number: 'ft-number', date: 'ft-date', dropdown: 'ft-dropdown', textarea: 'ft-textarea' };
+
+  async function renderFields() {
+    const fields = await getCustomFields();
+    const list = document.getElementById('fields-list');
+    const clearBtn = document.getElementById('clear-all-btn');
+
+    clearBtn.style.display = fields.length ? 'inline-flex' : 'none';
+
+    if (!fields.length) {
+      list.innerHTML = '<div class="no-fields">No custom fields added yet.<br/>Add fields from the left panel.</div>';
+      document.getElementById('fields-preview').innerHTML = '<p style="color:var(--text-muted);font-size:0.875rem;text-align:center;">No custom fields to preview</p>';
+      return;
+    }
+
+    list.innerHTML = fields.map((f, i) => `
+      <div class="field-chip" id="chip-${f.key}">
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <span class="field-chip-label">${TYPE_ICONS[f.type] || '📝'} ${esc(f.label)}</span>
+            <span class="badge field-type-badge ${TYPE_CLASSES[f.type] || 'ft-text'}">${f.type}</span>
+            ${f.required ? '<span class="badge badge-blue" style="font-size:0.65rem;">required</span>' : ''}
+          </div>
+          ${f.hint ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">${esc(f.hint)}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:0.3rem;">
+          ${i > 0 ? `<button class="field-chip-remove" onclick="moveField('${f.key}', -1)" title="Move up">↑</button>` : ''}
+          ${i < fields.length - 1 ? `<button class="field-chip-remove" onclick="moveField('${f.key}', 1)" title="Move down">↓</button>` : ''}
+          <button class="field-chip-remove" onclick="removeField('${f.key}')" title="Remove">✕</button>
+        </div>
+      </div>
+    `).join('');
+
+    // Live preview
+    document.getElementById('fields-preview').innerHTML = fields.map(f => `
+      <div class="form-group" style="margin-bottom:0.8rem;">
+        <label class="form-label">${esc(f.label)}${f.required ? ' <span class="required">*</span>' : ''}</label>
+        ${renderPreviewInput(f)}
+        ${f.hint ? `<div class="form-hint">${esc(f.hint)}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  function renderPreviewInput(f) {
+    switch (f.type) {
+      case 'textarea': return `<textarea class="form-control" rows="2" placeholder="${esc(f.placeholder||'')}" disabled></textarea>`;
+      case 'number': return `<input type="number" class="form-control" placeholder="${esc(f.placeholder||'')}" disabled />`;
+      case 'date': return `<input type="date" class="form-control" disabled />`;
+      case 'dropdown':
+        const opts = (f.options||'').split(',').map(o=>o.trim()).filter(Boolean);
+        return `<select class="form-control" disabled><option>Select…</option>${opts.map(o=>`<option>${esc(o)}</option>`).join('')}</select>`;
+      default: return `<input type="text" class="form-control" placeholder="${esc(f.placeholder||'Enter '+f.label)}" disabled />`;
+    }
+  }
+
+  async function moveField(key, dir) {
+    const fields = await getCustomFields();
+    const idx = fields.findIndex(f => f.key === key);
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= fields.length) return;
+    [fields[idx], fields[newIdx]] = [fields[newIdx], fields[idx]];
+    await saveCustomFields(fields);
+    await renderFields();
+  }
+
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // ===== COUNTER =====
+  async function updateCounterDisplay() {
+    const val = await getCurrentPhotoNumber();
+    document.getElementById('counter-display').textContent = String(val).padStart(3, '0');
+    const next = val >= 1000 ? '001' : String(val + 1).padStart(3, '0');
+    document.getElementById('next-photo-num').textContent = next;
+  }
+
+  async function setCounter() {
+    const val = parseInt(document.getElementById('counter-input').value, 10);
+    if (isNaN(val) || val < 0 || val > 999) { showToast('Enter a value between 0 and 999.', 'error'); return; }
+    await db.collection('state').doc('counter').set({ val });
+    await updateCounterDisplay();
+    showToast(`Counter set to ${String(val).padStart(3,'0')}`, 'success');
+  }
+
+  function resetCounter() {
+    showConfirm('Reset Photo Counter', 'Reset the photo counter back to 0? Next photo will be 001.', async () => {
+      await db.collection('state').doc('counter').set({ val: 0 });
+      await updateCounterDisplay();
+      showToast('Photo counter reset to 0.', 'info');
+    });
+  }
+
+  // ===== DANGER ZONE =====
+  function confirmDeleteAll() {
+    showConfirm('Delete ALL Records', '⚠️ This will permanently delete ALL collected ID records from Firestore. This cannot be undone!', async () => {
+      showToast('Deleting records...', 'info');
+      const snap = await db.collection('records').get();
+      const batch = db.batch();
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      showToast('All records deleted.', 'success');
+    });
+  }
+
+  function confirmResetAll() {
+    showConfirm('Reset Entire App', '⚠️ This will delete ALL records, custom fields, and reset the photo counter from Firestore. This cannot be undone!', async () => {
+      showToast('Resetting app...', 'info');
+      
+      const snap = await db.collection('records').get();
+      const batch = db.batch();
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      
+      await saveCustomFields([]);
+      await db.collection('state').doc('counter').set({ val: 0 });
+      
+      await renderFields();
+      await updateCounterDisplay();
+      showToast('App reset complete.', 'info');
+    });
+  }
+
+  // ===== CONFIRM MODAL =====
+  function showConfirm(title, message, cb) {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+    confirmCallback = cb;
+    document.getElementById('confirm-modal').classList.add('open');
+  }
+  document.getElementById('confirm-action-btn').onclick = function() {
+    if (confirmCallback) confirmCallback();
+    closeConfirm();
+  };
+  function closeConfirm() {
+    document.getElementById('confirm-modal').classList.remove('open');
+    confirmCallback = null;
+  }
+  document.getElementById('confirm-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('confirm-modal')) closeConfirm();
+  });
+
+  init();
+</script>
+</body>
+</html>

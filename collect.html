@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Collect Record — ID Card Collector</title>
+  <meta name="description" content="Add or edit an ID card data record with photo upload." />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .collect-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; align-items: start; }
+    @media (max-width: 900px) { .collect-layout { grid-template-columns: 1fr; } }
+    .photo-number-badge {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: rgba(79,142,247,0.15); border: 1px solid rgba(79,142,247,0.3);
+      border-radius: 50px; padding: 0.3rem 0.8rem;
+      font-size: 0.85rem; color: var(--accent); font-weight: 700;
+      margin-bottom: 0.8rem;
+    }
+    .camera-feed {
+      width: 100%; border-radius: var(--radius);
+      border: 2px solid var(--accent); display: none; background: #000;
+    }
+    #camera-container { display: none; }
+    #camera-container.show { display: block; }
+    .photo-sidebar { position: sticky; top: 80px; }
+    .form-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.2rem; }
+    .form-actions { display: flex; gap: 0.8rem; flex-wrap: wrap; padding-top: 1rem; }
+    .custom-field-row { display: flex; gap: 0.5rem; align-items: flex-end; }
+    .custom-field-row .form-group { flex: 1; margin-bottom: 0; }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a href="dashboard.html" class="navbar-brand">
+    <div class="brand-icon">🪪</div>
+    ID Card Collector
+  </a>
+  <ul class="navbar-nav">
+    <li><a href="dashboard.html" class="nav-link">📊 Dashboard</a></li>
+    <li><a href="collect.html" class="nav-link active">➕ Add Record</a></li>
+    <li><a href="settings.html" class="nav-link">⚙️ Settings</a></li>
+    <li><a href="import.html" class="nav-link">📥 Import Excel</a></li>
+    <li><a href="admin.html" class="nav-link" id="nav-admin-link" style="display:none;">🔑 Admin</a></li>
+  </ul>
+  <div class="navbar-right">
+    <div class="user-badge">
+      <div class="avatar" id="user-avatar">U</div>
+      <span id="user-badge-text">User</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">🚪 Logout</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-header">
+    <h1 id="page-title">➕ Add New Record</h1>
+    <p id="page-desc">Fill in the collection fields and upload a photo</p>
+  </div>
+
+  <form id="collect-form" onsubmit="handleSubmit(event)">
+    <div class="collect-layout">
+
+      <!-- LEFT: FORM FIELDS -->
+      <div>
+        <!-- ORGANISATION SELECTOR -->
+        <div class="form-section" id="org-section">
+          <div class="section-title">🏫 Organisation</div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">School / Company Name <span class="required">*</span></label>
+            <select id="org-select" class="form-control" required>
+              <option value="">— Select Organisation —</option>
+            </select>
+            <div class="form-hint" id="org-hint">Select the school or company for this record.</div>
+          </div>
+        </div>
+
+        <!-- CUSTOM FIELDS -->
+        <div class="form-section" id="custom-fields-section">
+          <div class="section-title">🔧 Data Collection Fields</div>
+          <div id="custom-fields-container"></div>
+        </div>
+
+        <!-- FORM ACTIONS -->
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">💾 Save Record</button>
+          <a href="dashboard.html" class="btn btn-ghost btn-lg">✕ Cancel</a>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="resetForm()" style="margin-left:auto;">🔄 Reset</button>
+        </div>
+      </div>
+
+      <!-- RIGHT: PHOTO SIDEBAR -->
+      <div class="photo-sidebar">
+        <div class="form-section">
+          <div class="section-title">📷 Photo Upload</div>
+
+          <div id="photo-number-display" style="display:none;">
+            <div class="photo-number-badge">📷 Photo # <span id="photo-num-label">—</span></div>
+          </div>
+
+          <!-- Preview -->
+          <div class="photo-upload-area" id="photo-drop-zone">
+            <div class="photo-upload-placeholder" id="photo-placeholder">
+              <div class="upload-icon">🖼️</div>
+              <p>Drag & drop image here<br/>or use buttons below</p>
+            </div>
+            <img class="photo-preview" id="photo-preview" src="" alt="Photo preview" />
+          </div>
+
+          <!-- Camera feed -->
+          <div id="camera-container">
+            <video id="camera-feed" class="camera-feed" autoplay playsinline></video>
+            <div style="display:flex;gap:0.6rem;margin-top:0.8rem;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="capturePhoto()" style="flex:1;">📸 Capture</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="stopCamera()">✕ Close</button>
+            </div>
+          </div>
+
+          <!-- Buttons -->
+          <div class="photo-actions" id="photo-buttons">
+            <button type="button" class="btn btn-outline btn-sm" onclick="openCamera()">📸 Camera</button>
+            <label class="btn btn-ghost btn-sm" for="gallery-input" style="cursor:pointer;">🖼️ Gallery</label>
+            <input type="file" id="gallery-input" accept="image/*" hidden onchange="handleGalleryUpload(event)" />
+            <button type="button" class="btn btn-danger btn-sm" id="remove-photo-btn" onclick="removePhoto()" style="display:none;">✕ Remove</button>
+          </div>
+
+          <p class="form-hint" style="text-align:center;margin-top:0.8rem;">Photos are automatically renamed to sequential numbers (001–1000)</p>
+        </div>
+
+        <!-- TIPS CARD -->
+        <div class="card" style="margin-top:0;">
+          <div style="font-size:0.82rem;color:var(--text-muted);">
+            <p style="font-weight:600;color:var(--text-secondary);margin-bottom:0.5rem;">💡 Tips</p>
+            <ul style="list-style:none;display:flex;flex-direction:column;gap:0.4rem;">
+              <li>✔ Use clear, front-facing photos</li>
+              <li>✔ Ensure ID number is correct</li>
+              <li>✔ Add custom fields in Settings</li>
+              <li>✔ Export data anytime from Dashboard</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+<div id="toast-container"></div>
+
+<!-- Firebase CDNs -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+<script src="js/db.js"></script>
+<script>
+  const user = requireAuth();
+  let photoBlob = null;
+  let photoAssignedNumber = null;
+  let editId = null;
+  let stream = null;
+
+  async function init() {
+    renderUserBadge();
+    highlightNav();
+    await loadOrganisations();
+    await loadCustomFields();
+    await checkEditMode();
+  }
+
+  async function loadOrganisations() {
+    const orgs = await getOrganisations();
+    const sel = document.getElementById('org-select');
+    sel.innerHTML = '<option value="">— Select Organisation —</option>';
+    if (orgs.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = ''; opt.disabled = true;
+      opt.textContent = '⚠️ No organisations added yet (Admin must add them)';
+      sel.appendChild(opt);
+      document.getElementById('org-hint').textContent = 'Ask your admin to add school/company names first.';
+    } else {
+      orgs.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.id;
+        opt.setAttribute('data-name', o.name);
+        opt.setAttribute('data-type', o.type);
+        opt.textContent = (o.type === 'school' ? '🏫 ' : '🏢 ') + o.name;
+        sel.appendChild(opt);
+      });
+    }
+  }
+
+  async function checkEditMode() {
+    const params = new URLSearchParams(window.location.search);
+    editId = params.get('edit');
+    if (editId) {
+      const record = await getRecordById(editId);
+      if (!record) { showToast('Record not found.', 'error'); window.location.href = 'dashboard.html'; return; }
+      if (record.createdBy !== user.identifier && user.role !== 'admin') {
+        showToast('Unauthorized access to edit this record.', 'error');
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
+        return;
+      }
+      document.getElementById('page-title').textContent = '✏️ Edit Record';
+      document.getElementById('page-desc').textContent = 'Update the ID card record';
+      document.getElementById('submit-btn').textContent = '💾 Update Record';
+      await populateForm(record);
+    }
+  }
+
+  async function populateForm(r) {
+    // Organisation
+    if (r.organisationId) {
+      const sel = document.getElementById('org-select');
+      sel.value = r.organisationId;
+    }
+
+    // Custom fields
+    const customFields = await getCustomFields();
+    customFields.forEach(f => {
+      const el = document.getElementById(`cf-${f.key}`);
+      if (el) el.value = (r.customFields || {})[f.key] || '';
+    });
+
+    // Photo
+    if (r.hasPhoto && r.photoUrl) {
+      // With Firebase, we don't load the blob locally for edit. 
+      // We just preview the URL.
+      photoBlob = null; // Stays null unless user uploads a new photo
+      photoAssignedNumber = r.photoName;
+      showPhotoPreview(r.photoUrl);
+      showPhotoNumber(r.photoName);
+    }
+  }
+
+  async function loadCustomFields() {
+    const fields = await getCustomFields();
+    const container = document.getElementById('custom-fields-container');
+    if (!fields.length) {
+      container.innerHTML = `
+        <div class="empty-state" style="padding: 2rem 0; text-align: center; color: var(--text-muted);">
+          <div class="empty-icon" style="font-size: 3rem; margin-bottom: 0.5rem; opacity: 0.4;">⚙️</div>
+          <h3 style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 0.5rem;">No collection fields defined</h3>
+          <p style="font-size: 0.875rem;">Please go to the <a href="settings.html" style="color:var(--accent); font-weight:600; text-decoration:underline;">Settings</a> page to add dynamic fields first.</p>
+        </div>
+      `;
+      return;
+    }
+    container.innerHTML = fields.map(f => `
+      <div class="form-group">
+        <label class="form-label">${esc(f.label)}${f.required ? ' <span class="required">*</span>' : ''}</label>
+        ${renderCustomInput(f)}
+        ${f.hint ? `<div class="form-hint">${esc(f.hint)}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  function renderCustomInput(f) {
+    const id = `cf-${f.key}`;
+    switch (f.type) {
+      case 'textarea': return `<textarea id="${id}" class="form-control" rows="2" placeholder="${esc(f.placeholder||'')}" ${f.required?'required':''}></textarea>`;
+      case 'number': return `<input type="number" id="${id}" class="form-control" placeholder="${esc(f.placeholder||'')}" ${f.required?'required':''} />`;
+      case 'date': return `<input type="date" id="${id}" class="form-control" ${f.required?'required':''} />`;
+      case 'dropdown':
+        const opts = (f.options||'').split(',').map(o => o.trim()).filter(Boolean);
+        return `<select id="${id}" class="form-control" ${f.required?'required':''}><option value="">Select…</option>${opts.map(o=>`<option>${esc(o)}</option>`).join('')}</select>`;
+      default: return `<input type="text" id="${id}" class="form-control" placeholder="${esc(f.placeholder||'')}" ${f.required?'required':''} />`;
+    }
+  }
+
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // ===== PHOTO HANDLING =====
+  async function openCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } });
+      const video = document.getElementById('camera-feed');
+      video.srcObject = stream;
+      video.style.display = 'block';
+      document.getElementById('camera-container').classList.add('show');
+      document.getElementById('photo-buttons').style.display = 'none';
+    } catch (err) {
+      showToast('Camera access denied. Please allow camera or use Gallery.', 'error');
+    }
+  }
+
+  function stopCamera() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    document.getElementById('camera-feed').style.display = 'none';
+    document.getElementById('camera-container').classList.remove('show');
+    document.getElementById('photo-buttons').style.display = 'flex';
+  }
+
+  function capturePhoto() {
+    const video = document.getElementById('camera-feed');
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(blob => {
+      photoBlob = blob;
+      const url = URL.createObjectURL(blob);
+      showPhotoPreview(url);
+      assignPhotoNumber();
+      stopCamera();
+      showToast('Photo captured! 📸', 'success');
+    }, 'image/jpeg', 0.9);
+  }
+
+  function handleGalleryUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { showToast('Please select a valid image file.', 'error'); return; }
+    if (file.size > 10 * 1024 * 1024) { showToast('Image must be under 10MB.', 'error'); return; }
+    photoBlob = file;
+    const url = URL.createObjectURL(file);
+    showPhotoPreview(url);
+    assignPhotoNumber();
+    showToast('Photo selected! 🖼️', 'success');
+    e.target.value = '';
+  }
+
+  async function assignPhotoNumber() {
+    if (!photoAssignedNumber) {
+      // getNextPhotoNumber is async now!
+      photoAssignedNumber = await getNextPhotoNumber();
+    }
+    showPhotoNumber(photoAssignedNumber);
+  }
+
+  function showPhotoPreview(url) {
+    const preview = document.getElementById('photo-preview');
+    const placeholder = document.getElementById('photo-placeholder');
+    preview.src = url;
+    preview.classList.add('show');
+    placeholder.style.display = 'none';
+    document.getElementById('remove-photo-btn').style.display = 'inline-flex';
+  }
+
+  function showPhotoNumber(num) {
+    document.getElementById('photo-num-label').textContent = num;
+    document.getElementById('photo-number-display').style.display = 'block';
+  }
+
+  function removePhoto() {
+    photoBlob = null;
+    if (!editId) photoAssignedNumber = null;
+    document.getElementById('photo-preview').classList.remove('show');
+    document.getElementById('photo-preview').src = '';
+    document.getElementById('photo-placeholder').style.display = 'block';
+    document.getElementById('photo-number-display').style.display = 'none';
+    document.getElementById('remove-photo-btn').style.display = 'none';
+    // With Firebase, we do not decrement the global counter to avoid race conditions.
+  }
+
+  // Drag & Drop
+  const dropZone = document.getElementById('photo-drop-zone');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      photoBlob = file;
+      showPhotoPreview(URL.createObjectURL(file));
+      assignPhotoNumber();
+      showToast('Photo uploaded! 🖼️', 'success');
+    }
+  });
+
+  // ===== FORM SUBMIT =====
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Saving…';
+
+    try {
+      const customFields = await getCustomFields();
+
+      // Organisation validation
+      const orgSel = document.getElementById('org-select');
+      const orgId = orgSel.value;
+      const orgOpt = orgSel.selectedOptions[0];
+      const orgName = orgOpt ? orgOpt.getAttribute('data-name') || '' : '';
+      const orgType = orgOpt ? orgOpt.getAttribute('data-type') || '' : '';
+      if (!orgId) {
+        showToast('Please select an organisation (school/company).', 'error');
+        btn.disabled = false; btn.innerHTML = '💾 Save Record';
+        return;
+      }
+
+      const customData = {};
+      customFields.forEach(f => {
+        const el = document.getElementById(`cf-${f.key}`);
+        if (el) customData[f.key] = el.value;
+      });
+
+      const data = {
+        photoName: photoAssignedNumber || '',
+        customFields: customData,
+        createdBy: user.identifier,
+        organisationId: orgId,
+        organisationName: orgName,
+        organisationType: orgType,
+      };
+
+      let savedId;
+      if (editId) {
+        // If we uploaded a new photoBlob, hasPhoto becomes true. 
+        // If photoBlob is null, it means we didn't change the photo.
+        // We shouldn't overwrite hasPhoto to false unless they explicitly removed it.
+        // Wait, if they click `removePhoto()`, `photoAssignedNumber` becomes null (or we should set a flag).
+        // Actually, let's look at removePhoto(). If we are in edit mode, `photoAssignedNumber` is kept, but let's assume they removed it.
+        if (photoBlob === null && document.getElementById('photo-preview').classList.contains('show')) {
+          // They kept the existing photo
+        } else if (photoBlob === null) {
+          // They removed it
+          data.hasPhoto = false;
+          data.photoUrl = null;
+        } else {
+          data.hasPhoto = true;
+        }
+
+        await updateRecord(editId, data);
+        savedId = editId;
+        if (photoBlob) await savePhoto(editId, photoBlob);
+        showToast('Record updated successfully! ✅', 'success');
+      } else {
+        data.hasPhoto = !!photoBlob;
+        const record = await addRecord(data);
+        savedId = record.id;
+        if (photoBlob) await savePhoto(savedId, photoBlob);
+        showToast('Record saved successfully! 🎉', 'success');
+      }
+
+      setTimeout(() => window.location.href = 'dashboard.html', 800);
+    } catch (err) {
+      console.error(err);
+      showToast('Error saving record. Please try again.', 'error');
+      btn.disabled = false; btn.innerHTML = '💾 Save Record';
+    }
+  }
+
+  async function resetForm() {
+    document.getElementById('collect-form').reset();
+    removePhoto();
+    await loadCustomFields();
+  }
+
+  init();
+</script>
+</body>
+</html>

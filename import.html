@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Excel Import & Photo Upload — ID Card Collector</title>
+  <meta name="description" content="Import data from Excel sheets and upload photos individually for each imported record." />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .import-wizard { display: flex; flex-direction: column; gap: 1.5rem; }
+    .step-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 2rem; position: relative; display: none; }
+    .step-card.active { display: block; animation: fadeInUp 0.4s ease; }
+    .step-indicator { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.8rem 1.5rem; }
+    .step-dot { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; color: var(--text-muted); }
+    .step-dot.active { color: var(--accent); }
+    .step-dot.completed { color: var(--success); }
+    
+    .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 3rem 2rem; text-align: center; cursor: pointer; transition: var(--transition); }
+    .upload-zone:hover, .upload-zone.dragover { border-color: var(--accent); background: rgba(79,142,247,0.04); }
+    .upload-icon-big { font-size: 3.5rem; margin-bottom: 0.8rem; opacity: 0.4; }
+
+    .mapping-list { display: flex; flex-direction: column; gap: 0.8rem; margin: 1.2rem 0; }
+    .mapping-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 0.8rem 1.2rem; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+    .mapping-status { font-size: 0.8rem; padding: 0.2rem 0.5rem; border-radius: 4px; }
+    .status-created { background: rgba(72,187,120,0.15); color: #68d391; }
+    .status-mapped { background: rgba(79,142,247,0.15); color: #60a5fa; }
+
+    .preview-container { overflow-x: auto; max-height: 300px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin: 1.2rem 0; }
+    
+    /* Photo Upload Grid */
+    .photo-center-layout { display: flex; flex-direction: column; gap: 1.5rem; margin-top: 2rem; }
+    .photo-filters { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 1.2rem; }
+    
+    .uploader-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.2rem; transition: var(--transition); display: flex; flex-direction: column; justify-content: space-between; }
+    .uploader-card:hover { transform: translateY(-3px); background: var(--bg-card-hover); box-shadow: var(--shadow); }
+    .uploader-card.has-photo { border-color: rgba(72,187,120,0.4); }
+    
+    .uploader-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; border-bottom: 1px solid var(--border); padding-bottom: 0.6rem; }
+    .uploader-body { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; flex: 1; display: flex; flex-direction: column; gap: 0.3rem; }
+    .uploader-field { display: flex; gap: 0.5rem; }
+    .uploader-field-label { color: var(--text-muted); min-width: 90px; flex-shrink: 0; }
+    
+    .inline-upload-zone { border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 1rem; text-align: center; background: rgba(0,0,0,0.2); transition: var(--transition); position: relative; overflow: hidden; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .inline-upload-zone.has-img { border-style: solid; border-color: var(--accent); }
+    .inline-thumb { width: 100%; height: 120px; object-fit: cover; border-radius: var(--radius-sm); }
+    
+    .inline-camera-container { display: none; width: 100%; height: 140px; background: #000; border-radius: var(--radius-sm); overflow: hidden; position: relative; }
+    .inline-video { width: 100%; height: 100%; object-fit: cover; }
+    .inline-camera-btn { position: absolute; bottom: 0.5rem; left: 50%; transform: translateX(-50%); z-index: 10; }
+
+    .photo-tabs { display: flex; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px; gap: 3px; }
+    .photo-tab-btn { background: none; border: none; padding: 0.4rem 0.8rem; border-radius: 5px; cursor: pointer; color: var(--text-muted); font-size: 0.85rem; font-weight: 600; transition: var(--transition); }
+    .photo-tab-btn.active { background: var(--accent); color: white; }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a href="dashboard.html" class="navbar-brand">
+    <div class="brand-icon">🪪</div>
+    ID Card Collector
+  </a>
+  <ul class="navbar-nav">
+    <li><a href="dashboard.html" class="nav-link">📊 Dashboard</a></li>
+    <li><a href="collect.html" class="nav-link">➕ Add Record</a></li>
+    <li><a href="settings.html" class="nav-link">⚙️ Settings</a></li>
+    <li><a href="import.html" class="nav-link active">📥 Import Excel</a></li>
+    <li><a href="admin.html" class="nav-link" id="nav-admin-link" style="display:none;">🔑 Admin</a></li>
+  </ul>
+  <div class="navbar-right">
+    <div class="user-badge">
+      <div class="avatar" id="user-avatar">U</div>
+      <span id="user-badge-text">User</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">🚪 Logout</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <h1>📥 Excel Import & Photo Uploader</h1>
+    <p>Mass-import collector data from Excel files, and walk through to upload individual photos for each record.</p>
+  </div>
+
+  <!-- STEP INDICATOR -->
+  <div class="step-indicator">
+    <div class="step-dot active" id="dot-step1"><span>1️⃣</span> Upload Sheet</div>
+    <div class="step-dot" id="dot-step2"><span>2️⃣</span> Map Fields & Preview</div>
+    <div class="step-dot" id="dot-step3"><span>3️⃣</span> Data-Wise Photos</div>
+  </div>
+
+  <div class="import-wizard">
+    
+    <!-- STEP 1: UPLOAD SHEET -->
+    <div class="step-card active" id="card-step1">
+      <div class="section-title">📂 Step 1: Upload Excel/CSV Document</div>
+      <p style="color:var(--text-secondary);margin-bottom:1.5rem;font-size:0.9rem;">
+        Select an Excel (`.xlsx`, `.xls`) or Comma Separated Values (`.csv`) spreadsheet file. 
+        The app will parse each row as a data record, automatically assign consecutive photo IDs (e.g. `001`, `002`), and let you map the columns to your dynamic fields.
+      </p>
+
+      <div style="margin-bottom: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <button type="button" class="btn btn-outline" onclick="downloadExcelTemplate()">📥 Download Excel Template (Current Custom Fields)</button>
+      </div>
+
+      <div class="upload-zone" id="excel-drop-zone" onclick="document.getElementById('excel-file-input').click()">
+        <div class="upload-icon-big">📥</div>
+        <h3 style="margin-bottom:0.4rem;">Drag & drop Excel file here</h3>
+        <p style="color:var(--text-muted);font-size:0.875rem;">or click to select file from folders</p>
+        <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" hidden onchange="handleExcelUpload(event)" />
+      </div>
+
+      <div class="card" style="margin-top:1.5rem;background:rgba(255,255,255,0.02);">
+        <p style="font-weight:600;font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.4rem;">💡 Pro Tip for Importing:</p>
+        <ul style="font-size:0.8rem;color:var(--text-muted);list-style:none;display:flex;flex-direction:column;gap:0.3rem;">
+          <li>✔ Column headers in your Excel sheet will automatically map to your active settings fields.</li>
+          <li>✔ Any new columns found in the sheet can be auto-created as custom fields automatically!</li>
+          <li>✔ Records are created in the draft queue instantly so you can upload pictures at your own pace.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- STEP 2: MAP FIELDS & PREVIEW -->
+    <div class="step-card" id="card-step2">
+      <div class="section-title">🛠️ Step 2: Columns Mapping & Record Preview</div>
+      
+      <div style="margin-bottom:1.5rem;">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem;">Column Schema Mapping:</h3>
+        <div class="mapping-list" id="mapping-list">
+          <!-- Mapping status rendered here -->
+        </div>
+        <div style="display:flex;align-items:center;gap:0.8rem;margin:1rem 0;">
+          <label class="switch">
+            <input type="checkbox" id="auto-create-fields" checked />
+            <span class="slider"></span>
+          </label>
+          <span style="font-size:0.85rem;color:var(--text-secondary);">Automatically create new dynamic fields found in Excel</span>
+        </div>
+      </div>
+
+      <div>
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem;" id="preview-title">Records Preview:</h3>
+        <div class="preview-container">
+          <table style="font-size:0.8rem;" id="preview-table">
+            <thead>
+              <tr id="preview-thead-row"></tr>
+            </thead>
+            <tbody id="preview-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:0.8rem;justify-content:flex-end;margin-top:1.5rem;border-top:1px solid var(--border);padding-top:1.2rem;">
+        <button class="btn btn-ghost" onclick="goToStep(1)">← Back</button>
+        <button class="btn btn-primary btn-lg" id="import-submit-btn" onclick="executeImport()">💾 Import Records & Proceed →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: DATA-WISE PHOTO UPLOAD CENTER -->
+    <div class="step-card" id="card-step3">
+      <div class="section-title" style="margin-bottom:0.5rem;">📸 Step 3: Data-Wise Photo Uploader</div>
+      <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem;">
+        Records imported successfully! Search for any record below, click **📸 Camera** or **🖼️ Gallery**, and upload the photo. 
+        It will be auto-saved and linked sequentially.
+      </p>
+
+      <div class="photo-filters">
+        <div class="input-group" style="max-width:320px;width:100%;">
+          <span class="input-group-icon">🔍</span>
+          <input type="text" class="form-control has-icon" id="photo-search-input" placeholder="Search record by value…" oninput="filterPhotoGrid()" />
+        </div>
+        
+        <div style="display:flex;gap:0.8rem;align-items:center;">
+          <div class="photo-tabs">
+            <button class="photo-tab-btn active" id="tab-photo-all" onclick="setPhotoTab('all')">All</button>
+            <button class="photo-tab-btn" id="tab-photo-missing" onclick="setPhotoTab('missing')">Missing Photo</button>
+            <button class="photo-tab-btn" id="tab-photo-done" onclick="setPhotoTab('done')">Photo Linked</button>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="clearPhotoSearch()">🔄 Reset</button>
+        </div>
+      </div>
+
+      <div class="photo-grid" id="photo-grid">
+        <!-- Rendered dynamically -->
+      </div>
+      
+      <div style="display:flex;justify-content:space-between;margin-top:2rem;border-top:1px solid var(--border);padding-top:1rem;flex-wrap:wrap;gap:1rem;">
+        <button class="btn btn-ghost btn-lg" onclick="goToStep(1)">📥 Import Another Excel Sheet</button>
+        <a href="dashboard.html" class="btn btn-success btn-lg">📊 Go to Dashboard Center</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<!-- SheetJS CDN for excel parsing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="js/db.js"></script>
+<script>
+  const user = requireAdmin();
+  let excelRows = [];
+  let excelHeaders = [];
+  let currentStep = 1;
+  
+  // Photo uploader state
+  let photoCenterRecords = [];
+  let activeTab = 'all';
+  let activeStreams = {}; // Store running camera streams by record ID
+
+  async function init() {
+    renderUserBadge();
+    highlightNav();
+    
+    // Check if we already have imported records to display in step 3
+    const checkRecords = getRecordsForUser(user);
+    if (checkRecords.length > 0) {
+      photoCenterRecords = checkRecords;
+      // We can let them view Step 3 directly by default if they click the page
+      goToStep(1); // Start at step 1 but load Step 3 records ready
+      loadStep3();
+    }
+  }
+
+  function downloadExcelTemplate() {
+    const fields = getCustomFields();
+    if (!fields || fields.length === 0) {
+      showToast('Please add custom fields in Settings first to generate a template!', 'error');
+      return;
+    }
+    const headers = fields.map(f => f.label);
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.writeFile(wb, `Data_Collection_Template.xlsx`);
+    showToast('Excel Template downloaded successfully! Fill it and upload here.', 'success');
+  }
+
+  function goToStep(step) {
+    currentStep = step;
+    
+    // Update Indicators
+    document.querySelectorAll('.step-dot').forEach((dot, index) => {
+      const stepIdx = index + 1;
+      dot.classList.toggle('active', stepIdx === step);
+      dot.classList.toggle('completed', stepIdx < step);
+    });
+
+    // Update Cards
+    document.getElementById('card-step1').classList.toggle('active', step === 1);
+    document.getElementById('card-step2').classList.toggle('active', step === 2);
+    document.getElementById('card-step3').classList.toggle('active', step === 3);
+  }
+
+  // ===== DRAG & DROP FOR STEP 1 =====
+  const dropZone = document.getElementById('excel-drop-zone');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) parseExcelFile(file);
+  });
+
+  function handleExcelUpload(e) {
+    const file = e.target.files[0];
+    if (file) parseExcelFile(file);
+    e.target.value = '';
+  }
+
+  // ===== SHEETJS EXCEL PARSING =====
+  function parseExcelFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx', 'xls', 'csv'].includes(ext)) {
+      showToast('Please upload a valid Excel or CSV sheet.', 'error');
+      return;
+    }
+
+    showToast('Reading file schema, please wait...', 'info');
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        
+        // Parse rows
+        excelRows = XLSX.utils.sheet_to_json(sheet);
+        if (excelRows.length === 0) {
+          showToast('The uploaded sheet is empty.', 'error');
+          return;
+        }
+
+        // Get headers
+        excelHeaders = [];
+        const range = XLSX.utils.decode_range(sheet['!ref']);
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const address = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+          const cell = sheet[address];
+          if (cell && cell.v) {
+            excelHeaders.push(cell.v.toString().trim());
+          }
+        }
+
+        showToast(`Parsed ${excelRows.length} rows successfully!`, 'success');
+        loadStep2();
+      } catch (err) {
+        console.error(err);
+        showToast('Error parsing Excel file details.', 'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ===== STEP 2 LAYOUT GENERATION =====
+  function loadStep2() {
+    const mappingList = document.getElementById('mapping-list');
+    const currentFields = getCustomFields();
+    
+    // Build header mappings
+    mappingList.innerHTML = excelHeaders.map(header => {
+      const exists = currentFields.some(f => f.label.toLowerCase() === header.toLowerCase());
+      return `
+        <div class="mapping-item">
+          <div>
+            <span style="font-size:1.1rem;margin-right:0.5rem;">📊</span>
+            <strong>${esc(header)}</strong>
+          </div>
+          <div>
+            ${exists 
+              ? `<span class="mapping-status status-mapped">✓ Matches Active Field</span>`
+              : `<span class="mapping-status status-created">⚡ Auto-Create as New Dynamic Field</span>`}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Preview table
+    const thead = document.getElementById('preview-thead-row');
+    thead.innerHTML = excelHeaders.map(h => `<th>${esc(h)}</th>`).join('');
+
+    const tbody = document.getElementById('preview-tbody');
+    const previewRows = excelRows.slice(0, 5); // Limit to first 5 rows
+    tbody.innerHTML = previewRows.map(row => `
+      <tr>
+        ${excelHeaders.map(h => `<td>${esc(row[h] || '—')}</td>`).join('')}
+      </tr>
+    `).join('');
+
+    document.getElementById('preview-title').textContent = `Records Preview (First 5 of ${excelRows.length} Rows):`;
+    goToStep(2);
+  }
+
+  // ===== EXECUTE MASS IMPORT =====
+  function executeImport() {
+    const autoCreate = document.getElementById('auto-create-fields').checked;
+    let currentFields = getCustomFields();
+    const records = getRecords();
+
+    showToast('Importing records...', 'info');
+
+    // 1. Auto-create custom fields if checked
+    if (autoCreate) {
+      let fieldsAdded = false;
+      excelHeaders.forEach(header => {
+        const exists = currentFields.some(f => f.label.toLowerCase() === header.toLowerCase());
+        if (!exists) {
+          const key = 'cf_' + header.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
+          currentFields.push({
+            key,
+            label: header,
+            type: 'text',
+            placeholder: `Enter ${header}`,
+            hint: '',
+            required: false,
+            options: ''
+          });
+          fieldsAdded = true;
+        }
+      });
+      if (fieldsAdded) {
+        saveCustomFields(currentFields);
+      }
+    }
+
+    // Refresh custom fields references
+    currentFields = getCustomFields();
+
+    // 2. Insert records dynamically
+    let importCount = 0;
+    excelRows.forEach(row => {
+      const customData = {};
+      currentFields.forEach(f => {
+        // Find matching excel cell value (case-insensitive column search)
+        const matchKey = excelHeaders.find(h => h.toLowerCase() === f.label.toLowerCase());
+        if (matchKey) {
+          customData[f.key] = row[matchKey] || '';
+        }
+      });
+
+      const newRecord = {
+        id: generateId(),
+        photoName: getNextPhotoNumber(),
+        hasPhoto: false,
+        customFields: customData,
+        createdBy: user.identifier,
+        createdAt: new Date().toISOString()
+      };
+      
+      records.push(newRecord);
+      importCount++;
+    });
+
+    saveRecords(records);
+    showToast(`Successfully imported ${importCount} records to database! 📥`, 'success');
+    
+    // Refresh Step 3 records list
+    photoCenterRecords = getRecordsForUser(user);
+    loadStep3();
+  }
+
+  // ===== STEP 3: PHOTO UPLOADER SYSTEM =====
+  function loadStep3() {
+    goToStep(3);
+    renderPhotoGrid();
+  }
+
+  function setPhotoTab(tab) {
+    activeTab = tab;
+    document.getElementById('tab-photo-all').classList.toggle('active', tab === 'all');
+    document.getElementById('tab-photo-missing').classList.toggle('active', tab === 'missing');
+    document.getElementById('tab-photo-done').classList.toggle('active', tab === 'done');
+    renderPhotoGrid();
+  }
+
+  function filterPhotoGrid() {
+    renderPhotoGrid();
+  }
+
+  function clearPhotoSearch() {
+    document.getElementById('photo-search-input').value = '';
+    renderPhotoGrid();
+  }
+
+  async function renderPhotoGrid() {
+    const grid = document.getElementById('photo-grid');
+    const search = document.getElementById('photo-search-input').value.toLowerCase();
+    const customFields = getCustomFields();
+
+    // Attach local photo URLs dynamically for render preview
+    for (let r of photoCenterRecords) {
+      if (r.hasPhoto && !r._photoUrl) {
+        const blob = await getPhoto(r.id);
+        r._photoUrl = blob ? URL.createObjectURL(blob) : null;
+      }
+    }
+
+    const filtered = photoCenterRecords.filter(r => {
+      // Search
+      const matchSearch = !search ||
+        (r.photoName || '').includes(search) ||
+        (r.customFields && Object.values(r.customFields).some(v => String(v).toLowerCase().includes(search)));
+      
+      // Tab filter
+      if (activeTab === 'missing') return matchSearch && !r.hasPhoto;
+      if (activeTab === 'done') return matchSearch && r.hasPhoto;
+      return matchSearch;
+    });
+
+    if (filtered.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state" style="grid-column: 1/-1;">
+          <div class="empty-icon">🔍</div>
+          <h3>No records match active filters</h3>
+          <p>Please adjust your query or verify imported details</p>
+        </div>
+      `;
+      return;
+    }
+
+    grid.innerHTML = filtered.map(r => {
+      // Map details
+      const detailsHtml = customFields.map(f => {
+        const val = (r.customFields || {})[f.key];
+        if (!val) return '';
+        return `
+          <div class="uploader-field">
+            <span class="uploader-field-label">${esc(f.label)}:</span>
+            <strong>${esc(val)}</strong>
+          </div>
+        `;
+      }).filter(Boolean).slice(0, 3).join(''); // Show max 3 key details in uploader card
+
+      return `
+        <div class="uploader-card ${r.hasPhoto ? 'has-photo' : ''}" id="card-${r.id}">
+          <div>
+            <div class="uploader-header">
+              <span class="badge badge-purple" style="font-size:0.8rem;">Photo ID: ${r.photoName}</span>
+              ${r.hasPhoto 
+                ? '<span class="badge badge-green">✓ Linked</span>'
+                : '<span class="badge badge-blue" style="background:rgba(237,137,54,0.15);color:#fbbf24;">⚡ No Photo</span>'}
+            </div>
+            
+            <div class="uploader-body">
+              ${detailsHtml || '<div style="color:var(--text-muted);font-style:italic;">No data fields populated</div>'}
+            </div>
+          </div>
+
+          <div>
+            <!-- Inline Upload / Camera Zone -->
+            <div class="inline-upload-zone ${r.hasPhoto ? 'has-img' : ''}" id="zone-${r.id}">
+              ${r.hasPhoto 
+                ? `<img class="inline-thumb" id="thumb-${r.id}" src="${r._photoUrl}" alt="Thumbnail" onclick="previewImage('${r._photoUrl}', '${r.photoName}')" style="cursor:pointer;" />`
+                : `
+                  <div id="placeholder-${r.id}">
+                    <div style="font-size:2rem;margin-bottom:0.3rem;opacity:0.4;">👤</div>
+                    <p style="font-size:0.75rem;color:var(--text-muted);">No photo linked yet</p>
+                  </div>
+                `}
+              
+              <!-- Inline Camera Preview -->
+              <div class="inline-camera-container" id="camera-cnt-${r.id}">
+                <video class="inline-video" id="video-${r.id}" autoplay playsinline></video>
+                <button type="button" class="btn btn-primary btn-sm inline-camera-btn" onclick="captureInlinePhoto('${r.id}')">📸 Capture</button>
+              </div>
+            </div>
+
+            <!-- Upload Buttons -->
+            <div class="photo-actions" id="actions-${r.id}" style="margin-top:0.8rem;gap:0.4rem;">
+              <button class="btn btn-outline btn-sm" onclick="openInlineCamera('${r.id}')" id="cam-btn-${r.id}">📸 Camera</button>
+              
+              <label class="btn btn-ghost btn-sm" for="file-inp-${r.id}" id="gal-btn-${r.id}">🖼️ Gallery</label>
+              <input type="file" id="file-inp-${r.id}" accept="image/*" hidden onchange="handleInlineGalleryUpload(event, '${r.id}')" />
+              
+              ${r.hasPhoto ? `<button class="btn btn-danger btn-sm" onclick="removeInlinePhoto('${r.id}')">✕ Clear</button>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function previewImage(url, name) {
+    // Rely on global db.js functions if present, or alert
+    if (typeof showToast === 'function') {
+      let imgModal = document.getElementById('import-photo-modal');
+      if (!imgModal) {
+        imgModal = document.createElement('div');
+        imgModal.id = 'import-photo-modal';
+        imgModal.className = 'modal-overlay';
+        imgModal.innerHTML = `
+          <div class="modal" style="max-width:400px;">
+            <div class="modal-header">
+              <span class="modal-title" id="imp-modal-title">Photo Preview</span>
+              <button class="modal-close" onclick="document.getElementById('import-photo-modal').classList.remove('open')">✕</button>
+            </div>
+            <img id="imp-modal-img" style="width:100%;max-height:60vh;object-fit:contain;border-radius:var(--radius-sm);" src="" />
+          </div>
+        `;
+        document.body.appendChild(imgModal);
+        imgModal.addEventListener('click', e => { if (e.target === imgModal) imgModal.classList.remove('open'); });
+      }
+      document.getElementById('imp-modal-img').src = url;
+      document.getElementById('imp-modal-title').textContent = `📷 Linked Portrait #${name}`;
+      imgModal.classList.add('open');
+    }
+  }
+
+  // ===== INLINE CAMERA CONTROLLER =====
+  async function openInlineCamera(recordId) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 320, height: 240 } });
+      activeStreams[recordId] = stream;
+
+      // Hide placeholder / thumbnail
+      const placeholder = document.getElementById(`placeholder-${recordId}`);
+      if (placeholder) placeholder.style.display = 'none';
+      const thumb = document.getElementById(`thumb-${recordId}`);
+      if (thumb) thumb.style.display = 'none';
+
+      // Show Camera Container
+      const cnt = document.getElementById(`camera-cnt-${recordId}`);
+      cnt.style.display = 'block';
+      const video = document.getElementById(`video-${recordId}`);
+      video.srcObject = stream;
+
+      // Disable/hide mapping buttons
+      document.getElementById(`cam-btn-${recordId}`).style.display = 'none';
+      document.getElementById(`gal-btn-${recordId}`).style.display = 'none';
+    } catch (err) {
+      showToast('Camera access denied. Please use gallery upload.', 'error');
+    }
+  }
+
+  function stopInlineCamera(recordId) {
+    const stream = activeStreams[recordId];
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      delete activeStreams[recordId];
+    }
+    const cnt = document.getElementById(`camera-cnt-${recordId}`);
+    if (cnt) cnt.style.display = 'none';
+    
+    // Restore button display
+    const cam = document.getElementById(`cam-btn-${recordId}`);
+    if (cam) cam.style.display = 'inline-flex';
+    const gal = document.getElementById(`gal-btn-${recordId}`);
+    if (gal) gal.style.display = 'inline-flex';
+  }
+
+  function captureInlinePhoto(recordId) {
+    const video = document.getElementById(`video-${recordId}`);
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 320;
+    canvas.height = video.videoHeight || 240;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    canvas.toBlob(async blob => {
+      await savePhoto(recordId, blob);
+      
+      // Update record status
+      updateRecordPhotoStatus(recordId, blob);
+      stopInlineCamera(recordId);
+      showToast('Photo linked successfully! 📸', 'success');
+    }, 'image/jpeg', 0.9);
+  }
+
+  async function handleInlineGalleryUpload(e, recordId) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { showToast('Select a valid image file.', 'error'); return; }
+    
+    await savePhoto(recordId, file);
+    updateRecordPhotoStatus(recordId, file);
+    showToast('Photo uploaded & linked! 🖼️', 'success');
+    e.target.value = '';
+  }
+
+  function updateRecordPhotoStatus(recordId, blob) {
+    const records = getRecords();
+    const idx = records.findIndex(r => r.id === recordId);
+    if (idx !== -1) {
+      records[idx].hasPhoto = true;
+      saveRecords(records);
+    }
+
+    // Sync state
+    const centerIdx = photoCenterRecords.findIndex(r => r.id === recordId);
+    if (centerIdx !== -1) {
+      photoCenterRecords[centerIdx].hasPhoto = true;
+      photoCenterRecords[centerIdx]._photoUrl = URL.createObjectURL(blob);
+    }
+
+    renderPhotoGrid();
+  }
+
+  async function removeInlinePhoto(recordId) {
+    await deletePhoto(recordId);
+    
+    const records = getRecords();
+    const idx = records.findIndex(r => r.id === recordId);
+    if (idx !== -1) {
+      records[idx].hasPhoto = false;
+      saveRecords(records);
+    }
+
+    const centerIdx = photoCenterRecords.findIndex(r => r.id === recordId);
+    if (centerIdx !== -1) {
+      photoCenterRecords[centerIdx].hasPhoto = false;
+      photoCenterRecords[centerIdx]._photoUrl = null;
+    }
+
+    showToast('Photo linkage removed.', 'info');
+    renderPhotoGrid();
+  }
+
+  function esc(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function formatDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-IN', { day:'2-digit', month:'short' });
+  }
+
+  init();
+</script>
+</body>
+</html>

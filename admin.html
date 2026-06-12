@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard — ID Card Collector</title>
+  <meta name="description" content="Super Admin Control Center. Manage organisations, users, collected data, and global stats." />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .admin-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+    .collector-badge { background: rgba(124,92,252,0.15); color: #c084fc; border: 1px solid rgba(124,92,252,0.3); font-weight: 500; font-size: 0.78rem; }
+    .org-badge-school { background: rgba(79,142,247,0.15); color: #60a5fa; border: 1px solid rgba(79,142,247,0.2); font-size: 0.78rem; font-weight: 600; border-radius: 20px; padding: 0.15rem 0.55rem; }
+    .org-badge-company { background: rgba(0,212,170,0.15); color: #6ee7b7; border: 1px solid rgba(0,212,170,0.2); font-size: 0.78rem; font-weight: 600; border-radius: 20px; padding: 0.15rem 0.55rem; }
+    .admin-action-row { display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; }
+    .user-row-highlight { background: rgba(79,142,247,0.03); }
+    .stat-card.admin-purple { background: rgba(124,92,252,0.1); border-color: rgba(124,92,252,0.2); }
+    .stat-card.admin-green { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.2); }
+    .stat-card.admin-orange { background: rgba(237,137,54,0.1); border-color: rgba(237,137,54,0.2); }
+    .stat-card.admin-teal { background: rgba(20,184,166,0.1); border-color: rgba(20,184,166,0.2); }
+    .view-filter-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin: 1.5rem 0 1rem; }
+    .view-filter-left { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
+    .active-filter-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: var(--accent); color: white; padding: 0.2rem 0.6rem; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: 600; }
+    .active-filter-badge button { background: none; border: none; color: white; cursor: pointer; font-size: 0.9rem; line-height: 1; }
+    .org-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 280px; overflow-y: auto; }
+    .org-chip { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.55rem 0.9rem; gap: 0.8rem; }
+    .org-chip-info { display: flex; align-items: center; gap: 0.6rem; flex: 1; }
+    .org-chip-name { font-weight: 600; font-size: 0.875rem; color: white; }
+    .org-chip-count { font-size: 0.75rem; color: var(--text-muted); }
+    .org-section-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .org-tab { background: var(--bg-card); border: 1px solid var(--border); padding: 0.35rem 0.9rem; border-radius: 20px; cursor: pointer; font-size: 0.8rem; color: var(--text-muted); font-weight: 500; transition: var(--transition); }
+    .org-tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+    .org-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .org-grid { grid-template-columns: 1fr; } }
+    .photo-modal-img { width: 100%; max-height: 60vh; object-fit: contain; border-radius: var(--radius-sm); }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a href="dashboard.html" class="navbar-brand">
+    <div class="brand-icon">🪪</div>
+    ID Card Collector
+  </a>
+  <ul class="navbar-nav">
+    <li><a href="dashboard.html" class="nav-link">📊 Dashboard</a></li>
+    <li><a href="collect.html" class="nav-link">➕ Add Record</a></li>
+    <li><a href="settings.html" class="nav-link">⚙️ Settings</a></li>
+    <li><a href="import.html" class="nav-link">📥 Import Excel</a></li>
+    <li><a href="admin.html" class="nav-link active" id="nav-admin-link">🔑 Admin</a></li>
+  </ul>
+  <div class="navbar-right">
+    <div class="user-badge">
+      <div class="avatar" id="user-avatar">A</div>
+      <span id="user-badge-text">Admin</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">🚪 Logout</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <h1>🔑 Admin Control Panel</h1>
+    <p>Manage organisations, collector accounts, and audit all collected data.</p>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-grid" style="grid-template-columns: repeat(auto-fit,minmax(150px,1fr));">
+    <div class="stat-card">
+      <div class="stat-icon blue">📋</div>
+      <div>
+        <div class="stat-value" id="admin-stat-records">0</div>
+        <div class="stat-label">Total Records</div>
+      </div>
+    </div>
+    <div class="stat-card admin-purple">
+      <div class="stat-icon purple">👥</div>
+      <div>
+        <div class="stat-value" id="admin-stat-collectors">0</div>
+        <div class="stat-label">Registered Users</div>
+      </div>
+    </div>
+    <div class="stat-card admin-green">
+      <div class="stat-icon green">📷</div>
+      <div>
+        <div class="stat-value" id="admin-stat-photos">0</div>
+        <div class="stat-label">Total Photos</div>
+      </div>
+    </div>
+    <div class="stat-card admin-teal">
+      <div class="stat-icon" style="background:rgba(20,184,166,0.15);color:#2dd4bf;">🏫</div>
+      <div>
+        <div class="stat-value" id="admin-stat-orgs">0</div>
+        <div class="stat-label">Organisations</div>
+      </div>
+    </div>
+    <div class="stat-card admin-orange">
+      <div class="stat-icon orange">📅</div>
+      <div>
+        <div class="stat-value" id="admin-stat-today">0</div>
+        <div class="stat-label">Added Today</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN ADMIN CONTENT -->
+  <div class="admin-grid">
+
+    <!-- 0. ORGANISATION MANAGEMENT -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;flex-wrap:wrap;gap:0.8rem;">
+        <div class="section-title" style="margin:0;">🏫🏢 Organisation Management <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">(Schools &amp; Companies)</span></div>
+      </div>
+
+      <div class="org-grid">
+        <!-- ADD ORG FORM -->
+        <div>
+          <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.8rem;">➕ Add New Organisation</div>
+          <div class="form-group">
+            <label class="form-label">Organisation Name <span class="required">*</span></label>
+            <input type="text" id="org-name-input" class="form-control" placeholder="e.g. Delhi Public School, TCS Ltd" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            <select id="org-type-input" class="form-control">
+              <option value="school">🏫 School / College</option>
+              <option value="company">🏢 Company / Organisation</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="addOrg()">➕ Add Organisation</button>
+        </div>
+
+        <!-- ORG LIST -->
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+            <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);">Current Organisations</div>
+            <span class="badge badge-blue" id="org-count-badge">0</span>
+          </div>
+          <div class="org-section-tabs">
+            <button class="org-tab active" onclick="filterOrgList('all', this)">All</button>
+            <button class="org-tab" onclick="filterOrgList('school', this)">🏫 Schools</button>
+            <button class="org-tab" onclick="filterOrgList('company', this)">🏢 Companies</button>
+          </div>
+          <div class="org-list" id="org-list">
+            <div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:1rem;">No organisations added yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PER-ORG VIEW & DOWNLOAD -->
+      <div style="margin-top:1.5rem;border-top:1px solid var(--border);padding-top:1.2rem;">
+        <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.8rem;">📥 View &amp; Download Data by Organisation</div>
+        <div style="display:flex;gap:0.8rem;align-items:flex-end;flex-wrap:wrap;">
+          <div class="form-group" style="width:100%;max-width:320px;margin:0;">
+            <label class="form-label" style="font-size:0.8rem;">Select Organisation</label>
+            <select id="org-download-select" class="form-control" onchange="loadOrgPreview()">
+              <option value="">— Pick an organisation —</option>
+            </select>
+          </div>
+          <button class="btn btn-success btn-sm" onclick="exportOrgExcel()">📥 Excel</button>
+          <button class="btn btn-outline btn-sm" onclick="exportOrgCSV()">📄 CSV</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadOrgPhotosZip()" style="border-color:var(--accent2);color:var(--accent2);">📸 Photos ZIP</button>
+        </div>
+        <div style="margin-top:0.8rem;font-size:0.8rem;color:var(--text-muted);" id="org-preview-info"></div>
+      </div>
+    </div>
+
+    <!-- 1. COLLECTOR ACCOUNTS MANAGEMENT -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;flex-wrap:wrap;gap:0.8rem;">
+        <div class="section-title" style="margin:0;">👥 Collector Accounts &amp; System Access</div>
+        <div class="input-group" style="max-width:280px;width:100%;">
+          <span class="input-group-icon">🔍</span>
+          <input type="text" class="form-control has-icon" id="user-search" placeholder="Search collectors…" oninput="filterCollectors()" />
+        </div>
+      </div>
+      
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Collector Name</th>
+              <th>Username / Identifier</th>
+              <th>System Role</th>
+              <th>Joined Date</th>
+              <th>Records Collected</th>
+              <th style="text-align:right;">Access Controls</th>
+            </tr>
+          </thead>
+          <tbody id="collectors-tbody">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 2. MASTER AUDIT DATA SHEET -->
+    <div class="card" style="margin-top:1rem;">
+      <div class="section-title">🔎 Master Audit Sheet (All Collected Data)</div>
+      
+      <div class="view-filter-bar">
+        <div class="view-filter-left">
+          <div class="input-group" style="width:220px;">
+            <span class="input-group-icon">🔍</span>
+            <input type="text" class="form-control has-icon" id="record-search" placeholder="Search data…" oninput="applyMasterFilters()" />
+          </div>
+          <select id="org-filter-select" class="form-control" style="min-width:180px;" onchange="applyMasterFilters()">
+            <option value="">All Organisations</option>
+          </select>
+          <div id="filter-indicator" style="display:none;"></div>
+        </div>
+        <div class="export-btns">
+          <button class="btn btn-success btn-sm" onclick="exportAdminExcel()">📥 Export Excel</button>
+          <button class="btn btn-outline btn-sm" onclick="exportAdminCSV()">📄 Export CSV</button>
+          <button class="btn btn-outline btn-sm" id="btn-admin-zip-download" onclick="downloadAdminPhotosZip()" style="border-color:var(--accent2); color:var(--accent2);">📸 Photos ZIP</button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr id="master-headers-row">
+              <!-- Headers generated dynamically -->
+            </tr>
+          </thead>
+          <tbody id="master-tbody">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- RESET PASSWORD MODAL -->
+<div class="modal-overlay" id="pwd-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title">🔒 Reset Collector Password</span>
+      <button class="modal-close" onclick="closeModal('pwd-modal')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Collector: <strong id="pwd-modal-user" style="color:var(--accent);">User</strong></label>
+      <input type="password" id="new-password" class="form-control" placeholder="Enter new strong password" required />
+      <div class="form-hint">Must be at least 6 characters.</div>
+    </div>
+    <div style="display:flex;gap:0.8rem;justify-content:flex-end;margin-top:1.5rem;">
+      <button class="btn btn-ghost" onclick="closeModal('pwd-modal')">Cancel</button>
+      <button class="btn btn-primary" id="confirm-pwd-btn">💾 Save Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- USER DELETE MODAL -->
+<div class="modal-overlay" id="delete-user-modal">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header">
+      <span class="modal-title" style="color:var(--danger);">⚠️ Permanent Account Deletion</span>
+      <button class="modal-close" onclick="closeModal('delete-user-modal')">✕</button>
+    </div>
+    <p style="color:var(--text-secondary);margin-bottom:1rem;">
+      Are you sure you want to delete <strong id="delete-username" style="color:white;"></strong>?
+    </p>
+    <div class="alert alert-danger" style="margin-bottom:1.5rem;">
+      <strong>⚠️ Warning:</strong> This permanently deletes ALL records and photos collected by this user.
+    </div>
+    <div style="display:flex;gap:0.8rem;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="closeModal('delete-user-modal')">Cancel</button>
+      <button class="btn btn-danger" id="confirm-delete-user-btn">🔥 Yes, Delete Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECORD DELETE MODAL -->
+<div class="modal-overlay" id="delete-record-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">🗑️ Delete Record</span>
+      <button class="modal-close" onclick="closeModal('delete-record-modal')">✕</button>
+    </div>
+    <p style="color:var(--text-secondary);margin-bottom:1.5rem;">Are you sure you want to delete this record? This action cannot be undone.</p>
+    <div style="display:flex;gap:0.8rem;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="closeModal('delete-record-modal')">Cancel</button>
+      <button class="btn btn-danger" id="confirm-delete-record-btn">🗑️ Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- PHOTO MODAL -->
+<div class="modal-overlay" id="photo-modal">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <span class="modal-title" id="photo-modal-title">Photo Preview</span>
+      <button class="modal-close" onclick="closeModal('photo-modal')">✕</button>
+    </div>
+    <img class="photo-modal-img" id="photo-modal-img" src="" alt="Photo preview" />
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<!-- SheetJS for Excel export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- JSZip for ZIP downloads -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<!-- Firebase CDNs -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+<script src="js/db.js"></script>
+<script>
+  const currentUser = requireAdmin();
+
+  let collectors = [];
+  let masterRecords = [];
+  let filteredRecords = [];
+  let targetUserId = null;
+  let targetRecordId = null;
+  let activeCollectorFilter = null;
+  let orgListFilter = 'all';
+
+  let unsubscribeRecords = null;
+  let unsubscribeUsers = null;
+  let unsubscribeSettings = null;
+  let customFieldsLocal = [];
+  let organisationsLocal = [];
+
+  async function init() {
+    renderUserBadge();
+    highlightNav();
+    customFieldsLocal = await getCustomFields();
+    organisationsLocal = await getOrganisations();
+    renderMasterTableHeaders();
+    setupRealtimeListeners();
+  }
+
+  function setupRealtimeListeners() {
+    unsubscribeRecords = db.collection('records').onSnapshot(snapshot => {
+      masterRecords = snapshot.docs.map(doc => doc.data());
+      for (let r of masterRecords) {
+        if (r.hasPhoto) r._photoUrl = r.photoUrl;
+      }
+      masterRecords.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+      updateStats();
+      applyMasterFilters();
+      renderOrgList();
+    });
+
+    unsubscribeUsers = db.collection('users').onSnapshot(snapshot => {
+      collectors = snapshot.docs.map(doc => doc.data());
+      updateStats();
+      renderCollectors();
+    });
+
+    unsubscribeSettings = db.collection('settings').onSnapshot(snapshot => {
+      snapshot.forEach(doc => {
+        if (doc.id === 'organisations') {
+          organisationsLocal = doc.data().list || [];
+          renderOrgList();
+          populateOrgDropdowns();
+          updateStats();
+        }
+        if (doc.id === 'custom_fields') {
+          customFieldsLocal = doc.data().fields || [];
+          renderMasterTableHeaders();
+          applyMasterFilters();
+        }
+      });
+    });
+  }
+
+  // ===== TABLE HEADERS =====
+  function renderMasterTableHeaders() {
+    const headerRow = document.getElementById('master-headers-row');
+    let html = `<th>Photo</th><th>Photo #</th><th>Organisation</th><th>Collected By</th>`;
+    customFieldsLocal.forEach(f => { html += `<th>${esc(f.label)}</th>`; });
+    html += `<th>Added On</th><th style="text-align:right;">Actions</th>`;
+    headerRow.innerHTML = html;
+  }
+
+  function updateStats() {
+    const today = new Date().toDateString();
+    document.getElementById('admin-stat-records').textContent = masterRecords.length;
+    document.getElementById('admin-stat-collectors').textContent = collectors.length;
+    document.getElementById('admin-stat-photos').textContent = masterRecords.filter(r => r.hasPhoto).length;
+    document.getElementById('admin-stat-orgs').textContent = organisationsLocal.length;
+    document.getElementById('admin-stat-today').textContent = masterRecords.filter(r => new Date(r.createdAt).toDateString() === today).length;
+  }
+
+  // ===== ORGANISATION MANAGEMENT =====
+  function addOrg() {
+    const nameInput = document.getElementById('org-name-input');
+    const typeInput = document.getElementById('org-type-input');
+    const name = nameInput.value.trim();
+    if (!name) { showToast('Please enter an organisation name.', 'error'); return; }
+    const existing = organisationsLocal;
+    if (existing.find(o => o.name.toLowerCase() === name.toLowerCase())) {
+      showToast('An organisation with this name already exists.', 'error'); return;
+    }
+    addOrganisation(name, typeInput.value);
+    nameInput.value = '';
+    showToast(`"${name}" added! ✅`, 'success');
+    updateStats();
+    renderOrgList();
+    populateOrgDropdowns();
+  }
+
+  function filterOrgList(type, btn) {
+    orgListFilter = type;
+    document.querySelectorAll('.org-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    renderOrgList();
+  }
+
+  function renderOrgList() {
+    const list = document.getElementById('org-list');
+    const countBadge = document.getElementById('org-count-badge');
+    let orgs = organisationsLocal;
+    countBadge.textContent = orgs.length;
+    if (orgListFilter !== 'all') orgs = orgs.filter(o => o.type === orgListFilter);
+
+    if (!orgs.length) {
+      list.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:1rem;">No ${orgListFilter === 'all' ? '' : orgListFilter + ' '}organisations yet.</div>`;
+      return;
+    }
+    list.innerHTML = orgs.map(o => {
+      const count = masterRecords.filter(r => r.organisationId === o.id).length;
+      const icon = o.type === 'school' ? '🏫' : '🏢';
+      const badgeClass = o.type === 'school' ? 'org-badge-school' : 'org-badge-company';
+      return `
+        <div class="org-chip">
+          <div class="org-chip-info">
+            <span>${icon}</span>
+            <div>
+              <div class="org-chip-name">${esc(o.name)}</div>
+              <div class="org-chip-count">${count} records &nbsp;·&nbsp; <span class="${badgeClass}">${o.type}</span></div>
+            </div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="removeOrg('${o.id}')">🗑️</button>
+        </div>`;
+    }).join('');
+  }
+
+  function removeOrg(orgId) {
+    const org = organisationsLocal.find(o => o.id === orgId);
+    if (!confirm(`Delete organisation "${org ? org.name : ''}"?`)) return;
+    deleteOrganisation(orgId);
+    showToast('Organisation removed.', 'info');
+    updateStats();
+    renderOrgList();
+    populateOrgDropdowns();
+  }
+
+  function populateOrgDropdowns() {
+    const orgs = organisationsLocal;
+    const dateStr = new Date().toISOString().slice(0, 10);
+
+    // Download select
+    const dlSel = document.getElementById('org-download-select');
+    const dlVal = dlSel.value;
+    dlSel.innerHTML = '<option value="">— Pick an organisation —</option>';
+    orgs.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.id;
+      opt.textContent = (o.type === 'school' ? '🏫 ' : '🏢 ') + o.name;
+      dlSel.appendChild(opt);
+    });
+    if (dlVal) dlSel.value = dlVal;
+
+    // Master filter select
+    const filterSel = document.getElementById('org-filter-select');
+    const filterVal = filterSel.value;
+    filterSel.innerHTML = '<option value="">All Organisations</option>';
+    orgs.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.id;
+      opt.textContent = (o.type === 'school' ? '🏫 ' : '🏢 ') + o.name;
+      filterSel.appendChild(opt);
+    });
+    if (filterVal) filterSel.value = filterVal;
+
+    loadOrgPreview();
+  }
+
+  function loadOrgPreview() {
+    const orgId = document.getElementById('org-download-select').value;
+    const info = document.getElementById('org-preview-info');
+    if (!orgId) { info.textContent = ''; return; }
+    const count = masterRecords.filter(r => r.organisationId === orgId).length;
+    const photos = masterRecords.filter(r => r.organisationId === orgId && r.hasPhoto).length;
+    const org = organisationsLocal.find(o => o.id === orgId);
+    info.innerHTML = `<strong style="color:white;">${org ? esc(org.name) : ''}</strong>: ${count} records, ${photos} with photos`;
+  }
+
+  // ===== PER-ORG EXPORTS =====
+  function getSelectedOrgRecords() {
+    const orgId = document.getElementById('org-download-select').value;
+    if (!orgId) { showToast('Please select an organisation first.', 'error'); return null; }
+    const records = masterRecords.filter(r => r.organisationId === orgId);
+    if (!records.length) { showToast('No records for this organisation.', 'error'); return null; }
+    return { orgId, records, org: organisationsLocal.find(o => o.id === orgId) };
+  }
+
+  function buildRow(r) {
+    const customFields = customFieldsLocal;
+    const row = {
+      'Organisation': r.organisationName || '',
+      'Org Type': r.organisationType || '',
+      'Photo #': r.photoName || '',
+      'Collected By': r.createdBy || '',
+      'Created At': r.createdAt ? new Date(r.createdAt).toLocaleString() : '',
+    };
+    customFields.forEach(f => { row[f.label] = (r.customFields || {})[f.key] || ''; });
+    return row;
+  }
+
+  function exportOrgExcel() {
+    const result = getSelectedOrgRecords();
+    if (!result) return;
+    const { records, org } = result;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(records.map(r => buildRow(r))), 'Records');
+    const safeName = (org ? org.name : 'Org').replace(/[^a-zA-Z0-9]/g, '_');
+    XLSX.writeFile(wb, `${safeName}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    showToast(`Excel exported for ${org ? org.name : 'org'}! 📥`, 'success');
+  }
+
+  function exportOrgCSV() {
+    const result = getSelectedOrgRecords();
+    if (!result) return;
+    const { records, org } = result;
+    const customFields = customFieldsLocal;
+    const headers = ['Organisation', 'Org Type', 'Photo #', 'Collected By', 'Created At', ...customFields.map(f => f.label)];
+    const rows = records.map(r => [
+      r.organisationName || '', r.organisationType || '', r.photoName || '', r.createdBy || '',
+      r.createdAt ? new Date(r.createdAt).toLocaleString() : '',
+      ...customFields.map(f => (r.customFields || {})[f.key] || ''),
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`));
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeName = (org ? org.name : 'Org').replace(/[^a-zA-Z0-9]/g, '_');
+    a.href = url; a.download = `${safeName}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    showToast(`CSV exported for ${org ? org.name : 'org'}! 📄`, 'success');
+  }
+
+  async function downloadOrgPhotosZip() {
+    const result = getSelectedOrgRecords();
+    if (!result) return;
+    const { records, org } = result;
+    const photoRecords = records.filter(r => r.hasPhoto);
+    if (!photoRecords.length) { showToast('No photos for this organisation.', 'error'); return; }
+    showToast('Packaging photos…', 'info');
+    try {
+      const zip = new JSZip();
+      let count = 0;
+      for (const r of photoRecords) {
+        const url = await getPhoto(r.id);
+        if (url) {
+          try {
+            const resp = await fetch(url);
+            const blob = await resp.blob();
+            const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/gif' ? 'gif' : 'jpg';
+            zip.file(`${r.photoName}.${ext}`, blob);
+            count++;
+          } catch(e) { console.error(e); }
+        }
+      }
+      if (!count) { showToast('No photos retrieved.', 'error'); return; }
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      const safeName = (org ? org.name : 'Org').replace(/[^a-zA-Z0-9]/g, '_');
+      a.href = url; a.download = `${safeName}_Photos_${new Date().toISOString().slice(0,10)}.zip`;
+      a.click(); URL.revokeObjectURL(url);
+      showToast(`${count} photos packaged for ${org ? org.name : 'org'}! 📸`, 'success');
+    } catch (err) {
+      console.error(err); showToast('Error creating ZIP.', 'error');
+    }
+  }
+
+  // ===== COLLECTOR LIST =====
+  function renderCollectors() {
+    const tbody = document.getElementById('collectors-tbody');
+    const searchVal = document.getElementById('user-search').value.toLowerCase();
+    const filteredUsers = collectors.filter(u =>
+      !searchVal || u.name.toLowerCase().includes(searchVal) || u.identifier.toLowerCase().includes(searchVal)
+    );
+    if (!filteredUsers.length) {
+      tbody.innerHTML = `<tr><td colspan="6" class="no-fields" style="text-align:center;">No collectors matched search</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = filteredUsers.map(u => {
+      const recordsCount = masterRecords.filter(r => r.createdBy === u.identifier).length;
+      const isSystemAdmin = u.role === 'admin';
+      return `
+        <tr class="${isSystemAdmin ? 'user-row-highlight' : ''}">
+          <td><div style="font-weight:700;color:white;">${esc(u.name)}</div></td>
+          <td><strong>${esc(u.identifier)}</strong></td>
+          <td><span class="badge ${isSystemAdmin ? 'badge-blue' : 'badge-green'}">${(u.role || 'user').toUpperCase()}</span></td>
+          <td style="font-size:0.8rem;color:var(--text-secondary);">${formatDate(u.createdAt)}</td>
+          <td><span class="badge badge-purple" style="font-size:0.85rem;padding:0.25rem 0.6rem;">${recordsCount} records</span></td>
+          <td>
+            <div class="admin-action-row">
+              <button class="btn btn-ghost btn-sm" onclick="filterByCollector('${u.identifier}')">👁️ View Data</button>
+              <button class="btn btn-warning btn-sm" onclick="openResetPassword('${u.id}', '${u.identifier}')">🔑 Reset Pwd</button>
+              ${!isSystemAdmin ? `<button class="btn btn-danger btn-sm" onclick="openDeleteUser('${u.id}', '${u.identifier}')">🗑️ Delete</button>` : `<button class="btn btn-ghost btn-sm" disabled style="opacity:0.3;cursor:not-allowed;">Locked</button>`}
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
+  }
+
+  function filterCollectors() { renderCollectors(); }
+
+  // ===== MASTER AUDIT DATA SHEET =====
+  function applyMasterFilters() {
+    const search = document.getElementById('record-search').value.toLowerCase();
+    const orgFilterId = document.getElementById('org-filter-select').value;
+
+    const filterIndicator = document.getElementById('filter-indicator');
+    if (activeCollectorFilter) {
+      filterIndicator.style.display = 'inline-block';
+      filterIndicator.innerHTML = `<span class="active-filter-badge">Collector: ${esc(activeCollectorFilter)}<button onclick="clearCollectorFilter()">✕</button></span>`;
+    } else {
+      filterIndicator.style.display = 'none';
+      filterIndicator.innerHTML = '';
+    }
+
+    filteredRecords = masterRecords.filter(r => {
+      if (activeCollectorFilter && r.createdBy !== activeCollectorFilter) return false;
+      if (orgFilterId && r.organisationId !== orgFilterId) return false;
+      if (!search) return true;
+      return (r.photoName || '').toLowerCase().includes(search) ||
+             (r.createdBy || '').toLowerCase().includes(search) ||
+             (r.organisationName || '').toLowerCase().includes(search) ||
+             Object.values(r.customFields || {}).some(v => String(v || '').toLowerCase().includes(search));
+    });
+
+    renderMasterSheet();
+  }
+
+  function filterByCollector(identifier) {
+    activeCollectorFilter = identifier;
+    applyMasterFilters();
+    showToast(`Showing data for: ${identifier}`, 'info');
+    document.getElementById('record-search').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function clearCollectorFilter() {
+    activeCollectorFilter = null;
+    applyMasterFilters();
+  }
+
+  function renderMasterSheet() {
+    const tbody = document.getElementById('master-tbody');
+    const customFields = customFieldsLocal;
+    const colCount = 6 + customFields.length;
+
+    if (!filteredRecords.length) {
+      tbody.innerHTML = `<tr><td colspan="${colCount}"><div class="empty-state"><div class="empty-icon">🔍</div><h3>No records found</h3><p>Try adjusting your search or filters</p></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filteredRecords.map(r => {
+      let customTds = '';
+      customFields.forEach(f => { customTds += `<td>${esc((r.customFields || {})[f.key] || '—')}</td>`; });
+      const orgIcon = r.organisationType === 'school' ? '🏫' : r.organisationType === 'company' ? '🏢' : '';
+      const orgBadgeClass = r.organisationType === 'school' ? 'org-badge-school' : 'org-badge-company';
+      return `
+        <tr>
+          <td>
+            ${r._photoUrl
+              ? `<img class="photo-thumb" src="${r._photoUrl}" alt="Photo" onclick="openPhotoModal('${r._photoUrl}','${r.photoName || ''}')" style="cursor:pointer;" />`
+              : `<div class="photo-placeholder">👤</div>`}
+          </td>
+          <td><span class="badge badge-purple">${r.photoName || '—'}</span></td>
+          <td>
+            ${r.organisationName
+              ? `<span class="${orgBadgeClass}">${orgIcon} ${esc(r.organisationName)}</span>`
+              : `<span style="color:var(--text-muted);font-size:0.78rem;">—</span>`}
+          </td>
+          <td><span class="badge collector-badge">${esc(r.createdBy || 'Unknown')}</span></td>
+          ${customTds}
+          <td style="font-size:0.78rem;color:var(--text-muted);">${formatDate(r.createdAt)}</td>
+          <td>
+            <div class="admin-action-row">
+              <a href="collect.html?edit=${r.id}" class="btn btn-warning btn-sm">✏️ Edit</a>
+              <button class="btn btn-danger btn-sm" onclick="confirmDeleteRecord('${r.id}')">🗑️ Delete</button>
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
+  }
+
+  // ===== PHOTO PREVIEW =====
+  function openPhotoModal(url, name) {
+    document.getElementById('photo-modal-img').src = url;
+    document.getElementById('photo-modal-title').textContent = `📷 Photo #${name}`;
+    document.getElementById('photo-modal').classList.add('open');
+  }
+
+  // ===== ACTIONS: RESET PASSWORD =====
+  function openResetPassword(userId, username) {
+    targetUserId = userId;
+    document.getElementById('pwd-modal-user').textContent = username;
+    document.getElementById('new-password').value = '';
+    document.getElementById('pwd-modal').classList.add('open');
+  }
+
+  document.getElementById('confirm-pwd-btn').onclick = function() {
+    const pwd = document.getElementById('new-password').value;
+    if (!pwd || pwd.length < 6) { showToast('Password must be at least 6 characters.', 'error'); return; }
+    if (resetUserPassword(targetUserId, pwd)) {
+      showToast('Password updated! ✅', 'success');
+      closeModal('pwd-modal');
+    } else { showToast('Error resetting password.', 'error'); }
+    targetUserId = null;
+  };
+
+  // ===== ACTIONS: DELETE COLLECTOR =====
+  function openDeleteUser(userId, username) {
+    targetUserId = userId;
+    document.getElementById('delete-username').textContent = username;
+    document.getElementById('delete-user-modal').classList.add('open');
+  }
+
+  document.getElementById('confirm-delete-user-btn').onclick = function() {
+    if (!targetUserId) return;
+    if (deleteUser(targetUserId)) {
+      showToast('Account and all data deleted! 🔥', 'success');
+      closeModal('delete-user-modal');
+    } else { showToast('Error deleting account.', 'error'); }
+    targetUserId = null;
+  };
+
+  // ===== ACTIONS: DELETE DATA RECORD =====
+  function confirmDeleteRecord(id) {
+    targetRecordId = id;
+    document.getElementById('delete-record-modal').classList.add('open');
+  }
+
+  document.getElementById('confirm-delete-record-btn').onclick = function() {
+    if (!targetRecordId) return;
+    deleteRecord(targetRecordId);
+    showToast('Record deleted.', 'success');
+    closeModal('delete-record-modal');
+    targetRecordId = null;
+  };
+
+  // ===== MODAL UTILITIES =====
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+  });
+
+  // ===== HELPERS =====
+  function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function formatDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  }
+
+  // ===== MASTER GLOBAL EXPORTS =====
+  function exportAdminExcel() {
+    if (!filteredRecords.length) { showToast('No data to export.', 'error'); return; }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filteredRecords.map(r => buildRow(r))), 'Global Audit');
+    XLSX.writeFile(wb, `Global_ID_Records_${new Date().toISOString().slice(0,10)}.xlsx`);
+    showToast('Global Excel exported! 📥', 'success');
+  }
+
+  function exportAdminCSV() {
+    if (!filteredRecords.length) { showToast('No data to export.', 'error'); return; }
+    const customFields = customFieldsLocal;
+    const headers = ['Organisation', 'Org Type', 'Photo #', 'Collected By', 'Created At', ...customFields.map(f => f.label)];
+    const rows = filteredRecords.map(r => [
+      r.organisationName || '', r.organisationType || '', r.photoName || '', r.createdBy || '',
+      r.createdAt ? new Date(r.createdAt).toLocaleString() : '',
+      ...customFields.map(f => (r.customFields || {})[f.key] || ''),
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`));
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `Global_ID_Records_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    showToast('Global CSV exported! 📄', 'success');
+  }
+
+  async function downloadAdminPhotosZip() {
+    const photoRecords = filteredRecords.filter(r => r.hasPhoto);
+    if (!photoRecords.length) { showToast('No photos in current filter.', 'error'); return; }
+    const btn = document.getElementById('btn-admin-zip-download');
+    const orig = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Zipping…';
+    showToast('Packaging photos…', 'info');
+    try {
+      const zip = new JSZip();
+      let count = 0;
+      for (const r of photoRecords) {
+        const url = await getPhoto(r.id);
+        if (url) {
+          try {
+            const resp = await fetch(url);
+            const blob = await resp.blob();
+            const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/gif' ? 'gif' : 'jpg';
+            zip.file(`${r.photoName}.${ext}`, blob);
+            count++;
+          } catch(e) { console.error(e); }
+        }
+      }
+      if (!count) { showToast('No photos found.', 'error'); btn.disabled=false; btn.innerHTML=orig; return; }
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url; a.download = `Global_Photos_${new Date().toISOString().slice(0,10)}.zip`;
+      a.click(); URL.revokeObjectURL(url);
+      showToast(`${count} photos packaged! 📸`, 'success');
+    } catch (err) {
+      console.error(err); showToast('Error creating ZIP.', 'error');
+    } finally {
+      btn.disabled = false; btn.innerHTML = orig;
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
